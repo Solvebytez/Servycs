@@ -38,3 +38,9 @@ export { default as GlobalStatusBar } from './StatusBar';
 export { ResponsiveText as Text } from './UI/ResponsiveText';
 export { ResponsiveCard as Card } from './UI/ResponsiveCard';
 export { ResponsiveButton as Button } from './UI/ResponsiveButton';
+export { BackButton } from './BackButton';
+
+// Default export to prevent Expo Router warnings
+export default function Components() {
+  return null; // This component is never rendered, just for export purposes
+}
