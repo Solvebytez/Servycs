@@ -1,177 +1,285 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { COLORS } from '../../../constants';
+import React from "react";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import {
+  COLORS,
+  FONT_SIZE,
+  MARGIN,
+  PADDING,
+  SPACING,
+} from "../../../constants";
+import {
+  ResponsiveText,
+  ResponsiveCard,
+  GlobalStatusBar,
+  VendorMetricsCards,
+  RecentEnquiries,
+} from "../../../components";
 
 export default function VendorDashboardScreen() {
+  const router = useRouter();
+
+  // Mock data for vendor metrics
+  const vendorMetrics = [
+    {
+      id: "1",
+      title: "My Listing",
+      value: "24",
+      growth: "8%",
+      icon: "list",
+      color: "#8B5CF6", // Purple
+    },
+    {
+      id: "2",
+      title: "Enquiries",
+      value: "47",
+      growth: "15%",
+      icon: "chatbubble",
+      color: "#F59E0B", // Yellow
+    },
+    {
+      id: "3",
+      title: "Total reviews",
+      value: "156",
+      growth: "12%",
+      icon: "star",
+      color: "#F97316", // Orange
+    },
+    {
+      id: "4",
+      title: "Your Promotions",
+      value: "3",
+      growth: "1%",
+      icon: "megaphone",
+      color: "#3B82F6", // Blue
+    },
+  ];
+
+  // Mock data for recent enquiries
+  const recentEnquiries = [
+    {
+      id: "1",
+      name: "Jay Johnson",
+      avatar:
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face&auto=format",
+      status: "new" as const,
+      timestamp: "2 hours ago",
+      subject: "Re: Swedish massage",
+      message:
+        "Hi! I would like to book a Swedish massage for this weekend. Are you available on Saturday afternoon?",
+    },
+    {
+      id: "2",
+      name: "John Snow",
+      avatar:
+        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face&auto=format",
+      status: "replied" as const,
+      timestamp: "5 hours ago",
+      subject: "Re: Hot Stone Therapy",
+      message: "What is the duration of the hot stone therapy session?",
+    },
+    {
+      id: "3",
+      name: "Sansa Stark",
+      avatar:
+        "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face&auto=format",
+      status: "new" as const,
+      timestamp: "1 day ago",
+      subject: "Re: Deep Tissue Massage",
+      message: "Do you offer deep tissue massage for sports injury recovery?",
+    },
+  ];
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Vendor Dashboard</Text>
-        <Text style={styles.subtitle}>Manage your business</Text>
-      </View>
-      
-      <ScrollView style={styles.content}>
-        <View style={styles.statsSection}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Active Services</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Total Bookings</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>₹0</Text>
-            <Text style={styles.statLabel}>Revenue</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>0.0</Text>
-            <Text style={styles.statLabel}>Rating</Text>
-          </View>
+    <>
+      <GlobalStatusBar />
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+        <View style={styles.container}>
+          {/* Header Section with Gradient */}
+          <LinearGradient
+            colors={[COLORS.primary[200], COLORS.primary[50], "#fff"]}
+            style={styles.headerGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          >
+            {/* Logo and Icons */}
+            <View style={styles.header}>
+              <View style={styles.logoContainer}>
+                <Image
+                  source={require("../../../assets/logo.png")}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.headerIcons}>
+                <TouchableOpacity style={styles.iconButton}>
+                  <Ionicons
+                    name="notifications"
+                    size={24}
+                    color={COLORS.black}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconButton}>
+                  <Ionicons name="settings" size={24} color={COLORS.black} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Business Name and Growth Message */}
+            <View style={styles.businessInfo}>
+              <View style={styles.businessNameContainer}>
+                <ResponsiveText
+                  variant="h3"
+                  weight="bold"
+                  color={COLORS.text.primary}
+                  style={styles.businessName}
+                >
+                  Serenity Spa & Wellness!
+                </ResponsiveText>
+                <ResponsiveText variant="h3" style={styles.celebrationEmoji}>
+                  🎉
+                </ResponsiveText>
+              </View>
+              <View style={styles.growthMessage}>
+                <Ionicons
+                  name="trending-up"
+                  size={16}
+                  color={COLORS.success[500]}
+                />
+                <ResponsiveText
+                  variant="body2"
+                  color={COLORS.text.secondary}
+                  style={styles.growthText}
+                >
+                  Your business is growing up!
+                </ResponsiveText>
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* Main Content */}
+          <ScrollView
+            style={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Metrics Cards Grid */}
+            <VendorMetricsCards metrics={vendorMetrics} />
+
+            {/* Recent Enquiries */}
+            <RecentEnquiries
+              enquiries={recentEnquiries}
+              onViewAll={() => router.push("/(dashboard)/(vendor)/bookings")}
+              onEnquiryPress={(enquiry) => {
+                // Handle enquiry press - could navigate to enquiry details
+                console.log("Enquiry pressed:", enquiry);
+              }}
+            />
+
+            {/* Bottom Spacing */}
+            <View style={styles.bottomSpacing} />
+          </ScrollView>
         </View>
-        
-        <View style={styles.quickActionsSection}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            <TouchableOpacity style={styles.actionCard}>
-              <Text style={styles.actionIcon}>➕</Text>
-              <Text style={styles.actionText}>Add Service</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <Text style={styles.actionIcon}>📊</Text>
-              <Text style={styles.actionText}>View Analytics</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <Text style={styles.actionIcon}>💰</Text>
-              <Text style={styles.actionText}>Earnings</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <Text style={styles.actionIcon}>📝</Text>
-              <Text style={styles.actionText}>Reviews</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        <View style={styles.recentSection}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📈</Text>
-            <Text style={styles.emptyTitle}>No recent activity</Text>
-            <Text style={styles.emptySubtitle}>Start by adding your first service</Text>
-          </View>
-        </View>
-      </ScrollView>
-    </View>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background.primary,
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background.primary,
   },
+  headerGradient: {
+    paddingBottom: MARGIN.lg,
+  },
   header: {
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: COLORS.primary[100],
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: PADDING.screen,
+    paddingTop: MARGIN.md,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    marginBottom: 8,
+  logoContainer: {
+    alignItems: "flex-start",
   },
-  subtitle: {
-    fontSize: 16,
-    color: COLORS.text.secondary,
+  logoImage: {
+    width: 80,
+    height: 80,
+    tintColor: COLORS.white,
+  },
+  headerIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: MARGIN.sm,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  businessInfo: {
+    paddingHorizontal: PADDING.screen,
+    marginTop: MARGIN.sm,
+  },
+  businessNameContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: MARGIN.sm,
+  },
+  businessName: {
+    flex: 1,
+  },
+  celebrationEmoji: {
+    marginLeft: MARGIN.sm,
+  },
+  growthMessage: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: MARGIN.xs,
+  },
+  growthText: {
+    marginLeft: MARGIN.xs,
   },
   content: {
     flex: 1,
+    paddingHorizontal: PADDING.screen,
   },
-  statsSection: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    padding: 20,
-    paddingBottom: 0,
+  bottomSpacing: {
+    height: 100,
   },
-  statCard: {
-    width: '48%',
-    backgroundColor: COLORS.background.secondary,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border.light,
+  bottomNavigation: {
+    flexDirection: "row",
+    backgroundColor: COLORS.white,
+    paddingVertical: PADDING.sm,
+    paddingHorizontal: PADDING.screen,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border.light,
+    justifyContent: "space-around",
+    alignItems: "center",
   },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.primary[200],
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-  },
-  quickActionsSection: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.text.primary,
-    marginBottom: 16,
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  actionCard: {
-    width: '48%',
-    backgroundColor: COLORS.success[50],
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.success[200],
-  },
-  actionIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  actionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.success[700],
-    textAlign: 'center',
-  },
-  recentSection: {
-    padding: 20,
+  navItem: {
+    alignItems: "center",
+    paddingVertical: PADDING.xs,
+    paddingHorizontal: PADDING.sm,
     flex: 1,
   },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.text.primary,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
+  activeNavItem: {
+    // Active state styling is handled by icon and text colors
   },
 });

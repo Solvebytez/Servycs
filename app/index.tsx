@@ -30,7 +30,7 @@ export default function SplashScreen() {
         if (isAuthenticated) {
           // If user is already authenticated, go to their dashboard
           // TODO: Get user role from token and navigate accordingly
-          router.replace('/(dashboard)/(user)/dashboard');
+          router.replace('/(dashboard)/(user)/home');
         } else {
           // If not authenticated, go to role selection first
           router.replace('/(auth)/role-selection');

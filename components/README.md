@@ -1,71 +1,74 @@
-# Global Components
+# Components Directory Structure
 
-This directory contains reusable components that can be used across the entire app.
+This directory contains all reusable components organized by role and functionality.
 
-## GlobalStatusBar
+## Directory Structure
 
-A reusable StatusBar component that provides consistent status bar styling across all screens.
-
-### Usage
-
-```tsx
-import { GlobalStatusBar } from '@/components';
-
-export default function MyScreen() {
-  return (
-    <>
-      <GlobalStatusBar />
-      {/* Your screen content */}
-    </>
-  );
-}
+```
+components/
+├── UI/                    # Generic UI components (ResponsiveText, ResponsiveCard, etc.)
+├── vendor/               # Vendor-specific components
+│   ├── VendorMetricsCards.tsx
+│   └── index.ts
+├── user/                 # User-specific components
+│   └── index.ts
+├── salesman/             # Salesman-specific components
+│   └── index.ts
+├── admin/                # Admin-specific components
+│   └── index.ts
+├── BackButton.tsx        # Shared components
+├── StatusBar.tsx
+├── index.ts              # Main export file
+└── README.md
 ```
 
-### Props
+## Usage
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `barStyle` | `'default' \| 'light-content' \| 'dark-content'` | `'light-content'` | Status bar text and icon style |
-| `backgroundColor` | `string` | `COLORS.primary[300]` | Status bar background color |
-| `translucent` | `boolean` | `true` | Whether status bar is translucent |
+### Importing Components
 
-### Default Configuration
+```typescript
+// Import from main components index
+import { VendorMetricsCards, ResponsiveText } from "@/components";
 
-- **barStyle**: `'light-content'` (white text/icons)
-- **backgroundColor**: `COLORS.primary[300]` (dark blue)
-- **translucent**: `true` (allows content to go behind status bar)
-
-### Customization Examples
-
-```tsx
-// Use default styling
-<GlobalStatusBar />
-
-// Custom background color
-<GlobalStatusBar backgroundColor={COLORS.secondary[500]} />
-
-// Dark content style
-<GlobalStatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
-
-// Non-translucent
-<GlobalStatusBar translucent={false} />
+// Or import directly from role-specific folder
+import { VendorMetricsCards } from "@/components/vendor";
 ```
 
-### Benefits
+### Adding New Components
 
-- **Consistency**: Same status bar styling across all screens
-- **Maintainability**: Change status bar globally from one place
-- **Reusability**: Import once, use everywhere
-- **Type Safety**: Full TypeScript support with proper props interface
+1. **Role-specific components**: Add to the appropriate role folder (vendor/, user/, salesman/, admin/)
+2. **Shared components**: Add to the root components directory
+3. **UI components**: Add to the UI/ directory
+4. **Update exports**: Make sure to export new components in the appropriate index.ts file
 
-### Screens Using GlobalStatusBar
+## Component Naming Convention
 
-- ✅ `(auth)/role-selection.tsx`
-- ✅ `(auth)/auth.tsx`
-- 🔄 Add to other screens as needed
+- Use PascalCase for component names
+- Prefix with role name for role-specific components (e.g., `VendorMetricsCards`)
+- Use descriptive names that indicate the component's purpose
 
-### Implementation Notes
+## Examples
 
-- Always place `GlobalStatusBar` at the top level of your component
-- Wrap your return statement in React Fragment (`<>`) if you have multiple top-level elements
-- The component automatically uses centralized color constants from `@/constants`
+### Vendor Components
+
+- `VendorMetricsCards` - Displays vendor dashboard metrics
+- `VendorServiceCard` - Individual service card for vendors
+- `VendorBookingCard` - Booking information card for vendors
+
+### User Components
+
+- `UserServiceCard` - Service card for users
+- `UserBookingCard` - Booking card for users
+- `UserProfileCard` - User profile information
+
+### Salesman Components
+
+- `SalesmanTargetCard` - Sales target information
+- `SalesmanPerformanceChart` - Performance visualization
+- `SalesmanClientCard` - Client information card
+
+### Admin Components
+
+- `AdminDashboardStats` - Admin dashboard statistics
+- `AdminUserManagement` - User management interface
+- `AdminAnalyticsChart` - Analytics visualization

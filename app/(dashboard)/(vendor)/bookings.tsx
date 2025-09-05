@@ -1,37 +1,86 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { COLORS } from '../../../constants';
+import { View, StyleSheet, ScrollView } from "react-native";
+import { COLORS, MARGIN, PADDING, FONT_SIZE } from "../../../constants";
+import {
+  ResponsiveText,
+  ResponsiveCard,
+  ResponsiveButton,
+} from "../../../components";
 
 export default function VendorBookingsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Incoming Bookings</Text>
-        <Text style={styles.subtitle}>Manage service requests</Text>
+        <ResponsiveText variant="h2" weight="bold" color={COLORS.text.primary}>
+          Incoming Bookings
+        </ResponsiveText>
+        <ResponsiveText variant="body1" color={COLORS.text.secondary}>
+          Manage service requests
+        </ResponsiveText>
       </View>
-      
+
       <ScrollView style={styles.content}>
         <View style={styles.statsSection}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Pending</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Confirmed</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Completed</Text>
-          </View>
+          <ResponsiveCard variant="elevated" style={styles.statCard}>
+            <ResponsiveText
+              variant="h2"
+              weight="bold"
+              color={COLORS.primary[300]}
+            >
+              0
+            </ResponsiveText>
+            <ResponsiveText variant="body2" color={COLORS.text.secondary}>
+              Pending
+            </ResponsiveText>
+          </ResponsiveCard>
+          <ResponsiveCard variant="elevated" style={styles.statCard}>
+            <ResponsiveText
+              variant="h2"
+              weight="bold"
+              color={COLORS.success[300]}
+            >
+              0
+            </ResponsiveText>
+            <ResponsiveText variant="body2" color={COLORS.text.secondary}>
+              Confirmed
+            </ResponsiveText>
+          </ResponsiveCard>
+          <ResponsiveCard variant="elevated" style={styles.statCard}>
+            <ResponsiveText variant="h2" weight="bold" color={COLORS.info[300]}>
+              0
+            </ResponsiveText>
+            <ResponsiveText variant="body2" color={COLORS.text.secondary}>
+              Completed
+            </ResponsiveText>
+          </ResponsiveCard>
         </View>
-        
+
         <View style={styles.bookingsSection}>
-          <Text style={styles.sectionTitle}>Recent Bookings</Text>
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📅</Text>
-            <Text style={styles.emptyTitle}>No bookings yet</Text>
-            <Text style={styles.emptySubtitle}>Bookings will appear here when customers make requests</Text>
-          </View>
+          <ResponsiveText
+            variant="h3"
+            weight="bold"
+            color={COLORS.text.primary}
+          >
+            Recent Bookings
+          </ResponsiveText>
+          <ResponsiveCard variant="elevated" style={styles.emptyState}>
+            <ResponsiveText variant="h1" style={styles.emptyIcon}>
+              📅
+            </ResponsiveText>
+            <ResponsiveText
+              variant="h4"
+              weight="bold"
+              color={COLORS.text.primary}
+            >
+              No bookings yet
+            </ResponsiveText>
+            <ResponsiveText
+              variant="body2"
+              color={COLORS.text.secondary}
+              style={styles.emptySubtitle}
+            >
+              Bookings will appear here when customers make requests
+            </ResponsiveText>
+          </ResponsiveCard>
         </View>
       </ScrollView>
     </View>
@@ -44,13 +93,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background.primary,
   },
   header: {
-    padding: 20,
+    padding: PADDING.lg,
     paddingTop: 60,
     backgroundColor: COLORS.primary[100],
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.text.primary,
     marginBottom: 8,
   },
@@ -62,8 +111,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statsSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     padding: 20,
     paddingBottom: 0,
   },
@@ -72,7 +121,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background.secondary,
     padding: 16,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
     marginHorizontal: 4,
     marginBottom: 16,
     borderWidth: 1,
@@ -80,14 +129,14 @@ const styles = StyleSheet.create({
   },
   statNumber: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.primary[200],
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
     color: COLORS.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   bookingsSection: {
     padding: 20,
@@ -95,14 +144,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.text.primary,
     marginBottom: 20,
   },
   emptyState: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 60,
   },
   emptyIcon: {
@@ -111,13 +160,13 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.text.primary,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
     color: COLORS.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });
