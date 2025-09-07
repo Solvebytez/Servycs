@@ -1,99 +1,104 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { COLORS, FONT_SIZE, MARGIN, PADDING } from '../../../constants';
+import React from "react";
+import { useRouter } from "expo-router";
+import { ProfileScreen, ProfileData, SettingItem } from "../../../components";
+import { COLORS } from "../../../constants";
 
 export default function UserProfileScreen() {
+  const router = useRouter();
+
+  // Mock user profile data
+  const userProfileData: ProfileData = {
+    id: "1",
+    name: "John Doe",
+    email: "johndoe@gmail.com",
+    avatar:
+      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face&auto=format",
+    role: "user",
+    phone: "+1 234 567 8900",
+    address: "123 Main St, City, State 12345",
+  };
+
+  // User-specific settings
+  const userSettings: SettingItem[] = [
+    {
+      id: "personal-details",
+      title: "Personal Details",
+      description: "Update your personal information",
+      icon: "person",
+      iconColor: COLORS.warning[600],
+      iconBackground: COLORS.warning[100],
+      onPress: () => {
+        // TODO: Navigate to edit profile screen
+        console.log("Personal details pressed");
+      },
+    },
+    {
+      id: "saved-lists",
+      title: "My Saved Lists",
+      description: "Organize your favorite places",
+      icon: "notifications",
+      iconColor: COLORS.info[600],
+      iconBackground: COLORS.info[100],
+      onPress: () => {
+        // TODO: Navigate to saved lists screen
+        console.log("Saved lists pressed");
+      },
+    },
+    {
+      id: "notifications",
+      title: "Notifications",
+      description: "Manage your notification preferences",
+      icon: "notifications",
+      iconColor: COLORS.info[600],
+      iconBackground: COLORS.info[100],
+      onPress: () => {
+        // TODO: Navigate to notifications settings
+        console.log("Notifications pressed");
+      },
+    },
+    {
+      id: "privacy-security",
+      title: "Privacy & Security",
+      description: "Control your privacy settings",
+      icon: "shield-checkmark",
+      iconColor: COLORS.success[600],
+      iconBackground: COLORS.success[100],
+      onPress: () => {
+        // TODO: Navigate to privacy settings screen
+        console.log("Privacy & security pressed");
+      },
+    },
+    {
+      id: "about-app",
+      title: "About App",
+      description: "Manage your payment options",
+      icon: "search",
+      iconColor: COLORS.info[600],
+      iconBackground: COLORS.info[100],
+      onPress: () => {
+        // TODO: Navigate to about app screen
+        console.log("About app pressed");
+      },
+    },
+  ];
+
+  const handleEditProfile = () => {
+    // TODO: Navigate to edit profile screen
+    console.log("Edit profile pressed");
+  };
+
+  const handleLogout = () => {
+    // TODO: Implement logout functionality
+    console.log("Logout pressed");
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Profile</Text>
-        <Text style={styles.subtitle}>Manage your account</Text>
-      </View>
-      
-      <View style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Name:</Text>
-            <Text style={styles.value}>John Doe</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Email:</Text>
-            <Text style={styles.value}>john@example.com</Text>
-          </View>
-        </View>
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Settings</Text>
-          <TouchableOpacity style={styles.settingItem}>
-            <Text style={styles.settingText}>Edit Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.settingItem}>
-            <Text style={styles.settingText}>Change Password</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.settingItem}>
-            <Text style={styles.settingText}>Privacy Settings</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </ScrollView>
+    <ProfileScreen
+      profileData={userProfileData}
+      settings={userSettings}
+      onEditProfile={handleEditProfile}
+      onLogout={handleLogout}
+      title="Manage Account"
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background.primary,
-  },
-  header: {
-    padding: PADDING.large,
-    paddingTop: 60,
-    backgroundColor: COLORS.primary[100],
-  },
-  title: {
-    fontSize: FONT_SIZE.h1,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    marginBottom: MARGIN.sm,
-  },
-  subtitle: {
-    fontSize: FONT_SIZE.body1,
-    color: COLORS.text.secondary,
-  },
-  content: {
-    padding: PADDING.large,
-  },
-  section: {
-    marginBottom: MARGIN.lg,
-  },
-  sectionTitle: {
-    fontSize: FONT_SIZE.h3,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    marginBottom: MARGIN.md,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: MARGIN.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  label: {
-    fontSize: FONT_SIZE.body1,
-    fontWeight: '500',
-    color: COLORS.text.primary,
-  },
-  value: {
-    fontSize: FONT_SIZE.body1,
-    color: COLORS.text.secondary,
-  },
-  settingItem: {
-    paddingVertical: MARGIN.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  settingText: {
-    fontSize: FONT_SIZE.body1,
-    color: COLORS.text.primary,
-  },
-});

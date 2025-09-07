@@ -31,8 +31,14 @@ export {
   type ButtonShape,
 } from "./UI/ResponsiveButton";
 
+// UserProfileButton component
+export { default as UserProfileButton } from "./UI/UserProfileButton";
+
 // Global StatusBar component
 export { default as GlobalStatusBar } from "./StatusBar";
+
+// Common components (used across multiple roles)
+export * from "./common";
 
 // Role-specific components
 export * from "./vendor";

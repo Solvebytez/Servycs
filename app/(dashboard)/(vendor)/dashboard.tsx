@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -16,6 +16,7 @@ import {
   MARGIN,
   PADDING,
   SPACING,
+  BORDER_RADIUS,
 } from "../../../constants";
 import {
   ResponsiveText,
@@ -23,10 +24,59 @@ import {
   GlobalStatusBar,
   VendorMetricsCards,
   RecentEnquiries,
+  LatestReviews,
+  UserProfileButton,
 } from "../../../components";
+import { userService, UserProfile } from "../../../services/user";
 
 export default function VendorDashboardScreen() {
   const router = useRouter();
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+
+  // Fetch user profile data
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        setIsLoadingUser(true);
+        // TODO: Implement actual API call when backend is ready
+        // const userProfile = await userService.getProfile();
+        // setUser(userProfile);
+
+        // Mock user data for UI development
+        setUser({
+          id: "1",
+          name: "Vendor User",
+          email: "vendor@example.com",
+          role: "vendor",
+          avatar:
+            "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face&auto=format",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+        // Set fallback user data if API fails
+        setUser({
+          id: "1",
+          name: "Vendor User",
+          email: "vendor@example.com",
+          role: "vendor",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  // Handle profile button press
+  const handleProfilePress = () => {
+    router.push("/(dashboard)/(vendor)/profile");
+  };
 
   // Mock data for vendor metrics
   const vendorMetrics = [
@@ -99,6 +149,46 @@ export default function VendorDashboardScreen() {
     },
   ];
 
+  // Mock data for latest reviews
+  const latestReviews = [
+    {
+      id: "1",
+      reviewerName: "Rahul Saini",
+      avatar:
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face&auto=format",
+      timestamp: "1 day ago",
+      rating: 5,
+      serviceType: "Swedish Massage",
+      message:
+        "Great massage therapy session. Very professional staff and clean facilities.",
+      helpfulCount: 12,
+    },
+    {
+      id: "2",
+      reviewerName: "Sansa Stark",
+      avatar:
+        "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face&auto=format",
+      timestamp: "2 days ago",
+      rating: 5,
+      serviceType: "Hot Stone Therapy",
+      message:
+        "Perfect experience from start to finish. Will definitely book again!",
+      helpfulCount: 8,
+    },
+    {
+      id: "3",
+      reviewerName: "Lisa Smith",
+      avatar:
+        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face&auto=format",
+      timestamp: "4 hours ago",
+      rating: 5,
+      serviceType: "Hydrating Facial",
+      message:
+        "Amazing service! The facial was incredibly relaxing and my skin feels wonderful. Highly recommend!",
+      helpfulCount: 15,
+    },
+  ];
+
   return (
     <>
       <GlobalStatusBar />
@@ -128,9 +218,13 @@ export default function VendorDashboardScreen() {
                     color={COLORS.black}
                   />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton}>
-                  <Ionicons name="settings" size={24} color={COLORS.black} />
-                </TouchableOpacity>
+                <UserProfileButton
+                  user={
+                    user ? { name: user.name, avatar: user.avatar } : undefined
+                  }
+                  size={40}
+                  onPress={handleProfilePress}
+                />
               </View>
             </View>
 
@@ -184,6 +278,20 @@ export default function VendorDashboardScreen() {
               }}
             />
 
+            {/* Latest Reviews */}
+            <LatestReviews
+              reviews={latestReviews}
+              onViewAll={() => router.push("/(dashboard)/(vendor)/reviews")}
+              onReviewPress={(review) => {
+                // Handle review press - could navigate to review details
+                console.log("Review pressed:", review);
+              }}
+              onHelpful={(review) => {
+                // Handle helpful action
+                console.log("Helpful pressed for review:", review.id);
+              }}
+            />
+
             {/* Bottom Spacing */}
             <View style={styles.bottomSpacing} />
           </ScrollView>
@@ -228,7 +336,7 @@ const styles = StyleSheet.create({
   iconButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: BORDER_RADIUS.xl,
     backgroundColor: COLORS.white,
     justifyContent: "center",
     alignItems: "center",

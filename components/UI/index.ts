@@ -1,7 +1,7 @@
 // Export all UI components from a single file
 
 // ResponsiveText components
-export { 
+export {
   default as ResponsiveText,
   DisplayText,
   HeadingText,
@@ -11,11 +11,11 @@ export {
   InputText,
   type ResponsiveTextProps,
   type TextVariant,
-  type TextWeight
-} from './ResponsiveText';
+  type TextWeight,
+} from "./ResponsiveText";
 
 // ResponsiveCard components
-export { 
+export {
   default as ResponsiveCard,
   TouchableCard,
   PrimaryCard,
@@ -28,11 +28,11 @@ export {
   type ResponsiveCardProps,
   type TouchableCardProps,
   type CardVariant,
-  type CardSize
-} from './ResponsiveCard';
+  type CardSize,
+} from "./ResponsiveCard";
 
 // ResponsiveButton components
-export { 
+export {
   default as ResponsiveButton,
   PrimaryButton,
   SecondaryButton,
@@ -48,10 +48,13 @@ export {
   type ResponsiveButtonProps,
   type ButtonVariant,
   type ButtonSize,
-  type ButtonShape
-} from './ResponsiveButton';
+  type ButtonShape,
+} from "./ResponsiveButton";
+
+// UserProfileButton component
+export { default as UserProfileButton } from "./UserProfileButton";
 
 // Re-export commonly used components for convenience
-export { ResponsiveText as Text } from './ResponsiveText';
-export { ResponsiveCard as Card } from './ResponsiveCard';
-export { ResponsiveButton as Button } from './ResponsiveButton';
+export { ResponsiveText as Text } from "./ResponsiveText";
+export { ResponsiveCard as Card } from "./ResponsiveCard";
+export { ResponsiveButton as Button } from "./ResponsiveButton";

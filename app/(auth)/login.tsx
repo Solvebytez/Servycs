@@ -1,11 +1,25 @@
-import { View, Text, StyleSheet } from 'react-native';
-import { COLORS } from '../../constants';
+import { View, Text, StyleSheet } from "react-native";
+import { COLORS, FONT_SIZE, PADDING, MARGIN } from "../../constants";
+import { ResponsiveText } from "../../components";
 
 export default function LoginScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Login</Text>
-      <Text style={styles.subtitle}>Welcome to Listro</Text>
+      <ResponsiveText
+        variant="h1"
+        weight="bold"
+        color={COLORS.text.primary}
+        style={styles.title}
+      >
+        Login
+      </ResponsiveText>
+      <ResponsiveText
+        variant="h4"
+        color={COLORS.text.secondary}
+        style={styles.subtitle}
+      >
+        Welcome to Listro
+      </ResponsiveText>
     </View>
   );
 }
@@ -13,20 +27,15 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: COLORS.background.primary,
-    padding: 20,
+    padding: PADDING.lg,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-    marginBottom: 16,
+    marginBottom: MARGIN.md,
   },
   subtitle: {
-    fontSize: 18,
-    color: COLORS.text.secondary,
-    marginBottom: 40,
+    marginBottom: MARGIN.xl,
   },
 });
