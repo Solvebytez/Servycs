@@ -44,7 +44,6 @@ export * from "./common";
 export * from "./vendor";
 export * from "./user";
 export * from "./salesman";
-export * from "./admin";
 
 // Re-export commonly used components for convenience
 export { ResponsiveText as Text } from "./UI/ResponsiveText";

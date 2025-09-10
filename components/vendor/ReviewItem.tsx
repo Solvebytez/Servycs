@@ -34,7 +34,7 @@ export const ReviewItem: React.FC<ReviewItemProps> = ({
         key={index}
         name={index < rating ? "star" : "star-outline"}
         size={FONT_SIZE.caption1}
-        color="#FFD700"
+        color="#FF8C00"
         style={{ marginRight: 2 }}
       />
     ));

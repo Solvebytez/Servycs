@@ -26,6 +26,7 @@ import {
   RecentEnquiries,
   LatestReviews,
   UserProfileButton,
+  ReviewDetailsModal,
 } from "../../../components";
 import { userService, UserProfile } from "../../../services/user";
 
@@ -33,6 +34,8 @@ export default function VendorDashboardScreen() {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [selectedReview, setSelectedReview] = useState(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
   // Fetch user profile data
   useEffect(() => {
@@ -266,12 +269,23 @@ export default function VendorDashboardScreen() {
             showsVerticalScrollIndicator={false}
           >
             {/* Metrics Cards Grid */}
-            <VendorMetricsCards metrics={vendorMetrics} />
+            <VendorMetricsCards
+              metrics={vendorMetrics}
+              onMetricPress={(metric) => {
+                if (metric.id === "1") {
+                  // Navigate to My List screen when "My Listing" card is pressed
+                  router.push("/(dashboard)/(vendor)/my-list");
+                } else if (metric.id === "4") {
+                  // Navigate to My Promotions screen when "Your Promotions" card is pressed
+                  router.push("/(dashboard)/(vendor)/my-promotions");
+                }
+              }}
+            />
 
             {/* Recent Enquiries */}
             <RecentEnquiries
               enquiries={recentEnquiries}
-              onViewAll={() => router.push("/(dashboard)/(vendor)/bookings")}
+              onViewAll={() => router.push("/(dashboard)/(vendor)/enquiries")}
               onEnquiryPress={(enquiry) => {
                 // Handle enquiry press - could navigate to enquiry details
                 console.log("Enquiry pressed:", enquiry);
@@ -283,8 +297,8 @@ export default function VendorDashboardScreen() {
               reviews={latestReviews}
               onViewAll={() => router.push("/(dashboard)/(vendor)/reviews")}
               onReviewPress={(review) => {
-                // Handle review press - could navigate to review details
-                console.log("Review pressed:", review);
+                setSelectedReview(review);
+                setIsModalVisible(true);
               }}
               onHelpful={(review) => {
                 // Handle helpful action
@@ -296,6 +310,13 @@ export default function VendorDashboardScreen() {
             <View style={styles.bottomSpacing} />
           </ScrollView>
         </View>
+
+        {/* Review Detail Modal */}
+        <ReviewDetailsModal
+          visible={isModalVisible}
+          review={selectedReview}
+          onClose={() => setIsModalVisible(false)}
+        />
       </SafeAreaView>
     </>
   );

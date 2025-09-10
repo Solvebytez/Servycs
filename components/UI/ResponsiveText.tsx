@@ -30,6 +30,7 @@ export type TextVariant =
   | "body3"
   | "caption1"
   | "caption2"
+  | "caption3"
   | "button"
   | "buttonSmall"
   | "input"
@@ -148,6 +149,12 @@ const TYPOGRAPHY: Record<TextVariant, TextStyle> = {
   caption2: {
     fontSize: responsiveFontSize(FONT_SIZE.caption2),
     lineHeight: LINE_HEIGHT.caption2,
+    fontFamily: FONT_FAMILY.regular,
+    fontWeight: FONT_WEIGHT.regular as any,
+  },
+  caption3: {
+    fontSize: responsiveFontSize(FONT_SIZE.caption3),
+    lineHeight: LINE_HEIGHT.caption3,
     fontFamily: FONT_FAMILY.regular,
     fontWeight: FONT_WEIGHT.regular as any,
   },

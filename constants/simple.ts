@@ -5,7 +5,9 @@ export const COLORS = {
     50: "#C4F6FF", // Lightest blue
     100: "#6EE8FF", // Light blue
     200: "#24C7E5", // Medium blue
-    300: "#2191A6", // Darkest blue
+    300: "#2191A6", // Dark blue
+    500: "#0F7A8A", // Darker blue
+    600: "#0A5D6B", // Darkest blue
   },
   // Basic Colors
   black: "#000000",
@@ -124,6 +126,7 @@ export const FONT_SIZE = {
   // Caption sizes
   caption1: 12,
   caption2: 10,
+  caption3: 9,
 
   // Button text sizes
   button: 16,
@@ -166,6 +169,7 @@ export const LINE_HEIGHT = {
   // Caption line heights
   caption1: 18,
   caption2: 15,
+  caption3: 13,
 
   // Button line heights
   button: 19,
@@ -277,6 +281,7 @@ export const BORDER_RADIUS = {
   xxxl: 32,
   round: 50,
   pill: 999,
+  full: 999,
   card: 8,
   cardLarge: 16,
   button: 8,

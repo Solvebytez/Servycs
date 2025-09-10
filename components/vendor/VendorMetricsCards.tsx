@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, MARGIN, PADDING } from "@/constants";
 import { ResponsiveText, ResponsiveCard } from "@/components/UI";
@@ -15,10 +15,12 @@ interface MetricData {
 
 interface VendorMetricsCardsProps {
   metrics: MetricData[];
+  onMetricPress?: (metric: MetricData) => void;
 }
 
 export const VendorMetricsCards: React.FC<VendorMetricsCardsProps> = ({
   metrics,
+  onMetricPress,
 }) => {
   return (
     <View style={styles.metricsGrid}>
@@ -27,8 +29,9 @@ export const VendorMetricsCards: React.FC<VendorMetricsCardsProps> = ({
           ...styles.metricCard,
           backgroundColor: metric.color,
         };
-        return (
-          <ResponsiveCard key={metric.id} variant="elevated" style={cardStyle}>
+
+        const cardContent = (
+          <ResponsiveCard variant="elevated" style={cardStyle}>
             <View style={styles.metricContent}>
               <View style={styles.metricHeader}>
                 <View
@@ -69,6 +72,26 @@ export const VendorMetricsCards: React.FC<VendorMetricsCardsProps> = ({
             </View>
           </ResponsiveCard>
         );
+
+        // Only wrap with TouchableOpacity if onMetricPress is provided
+        if (onMetricPress) {
+          return (
+            <TouchableOpacity
+              key={metric.id}
+              onPress={() => onMetricPress(metric)}
+              activeOpacity={0.8}
+              style={styles.cardWrapper}
+            >
+              {cardContent}
+            </TouchableOpacity>
+          );
+        }
+
+        return (
+          <View key={metric.id} style={styles.cardWrapper}>
+            {cardContent}
+          </View>
+        );
       })}
     </View>
   );
@@ -81,11 +104,14 @@ const styles = StyleSheet.create({
     marginTop: MARGIN.md,
     marginBottom: MARGIN.lg,
   },
-  metricCard: {
+  cardWrapper: {
     width: "48%",
-    padding: PADDING.md,
     marginBottom: MARGIN.md,
     marginHorizontal: "1%",
+  },
+  metricCard: {
+    width: "100%",
+    padding: PADDING.md,
     borderRadius: 12,
   },
   metricContent: {

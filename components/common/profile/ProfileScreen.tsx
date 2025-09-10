@@ -31,7 +31,7 @@ export interface ProfileData {
   name: string;
   email: string;
   avatar?: string;
-  role: "user" | "vendor" | "salesman" | "admin";
+  role: "user" | "vendor" | "salesman";
   businessName?: string; // For vendor/salesman
   verificationStatus?: "verified" | "pending" | "unverified";
   phone?: string;
@@ -234,7 +234,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 } else if (profileData.role === "salesman") {
                   router.push("/(dashboard)/(salesman)/edit-profile");
                 } else {
-                  // For admin or other roles, default to user edit profile
+                  // For other roles, default to user edit profile
                   router.push("/(dashboard)/(user)/edit-profile");
                 }
               }}
