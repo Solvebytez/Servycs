@@ -21,8 +21,14 @@ import {
   BORDER_RADIUS,
 } from "../../../constants";
 import { ResponsiveText, ResponsiveCard, GlobalStatusBar } from "@/components";
+import { useUser } from "../../../hooks/useUser";
 
 export default function UserHomeScreen() {
+  console.log("UserHomeScreen: Component rendering");
+
+  // Use React Query to fetch user data
+  const { data: user, isLoading, error } = useUser();
+
   // Mock data for favorite services
   const favoriteServices = [
     {
@@ -60,6 +66,10 @@ export default function UserHomeScreen() {
     },
   ];
 
+  // Debug arrays
+  console.log("UserHomeScreen: favoriteServices:", favoriteServices);
+  console.log("UserHomeScreen: serviceCategories:", serviceCategories);
+
   const handleSearchPress = () => {
     router.push("/(dashboard)/(user)/search");
   };
@@ -88,14 +98,36 @@ export default function UserHomeScreen() {
               <TouchableOpacity style={styles.iconButton}>
                 <Ionicons name="notifications" size={24} color={COLORS.black} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.profileButton}>
-                <ResponsiveText
-                  variant="buttonSmall"
-                  weight="bold"
-                  color={COLORS.black}
-                >
-                  RB
-                </ResponsiveText>
+              <TouchableOpacity
+                style={styles.profileButton}
+                onPress={() => {
+                  console.log(
+                    "UserHomeScreen: Profile button clicked, navigating to profile"
+                  );
+                  router.push("/(dashboard)/(user)/profile");
+                }}
+              >
+                {user?.avatar ? (
+                  <Image
+                    source={{ uri: (user as any).avatar }}
+                    style={styles.profileImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <ResponsiveText
+                    variant="buttonSmall"
+                    weight="bold"
+                    color={COLORS.black}
+                  >
+                    {(user as any)?.name
+                      ? (user as any).name
+                          .split(" ")
+                          .map((n: string) => n[0])
+                          .join("")
+                          .toUpperCase()
+                      : "U"}
+                  </ResponsiveText>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -143,72 +175,87 @@ export default function UserHomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.favoriteServicesContainer}
             >
-              {favoriteServices.map((service) => (
-                <TouchableOpacity
-                  key={service.id}
-                  style={styles.favoriteServiceCard}
-                >
-                  <View style={styles.serviceImageContainer}>
-                    <Image
-                      source={service.image}
-                      style={styles.serviceImage}
-                      resizeMode="cover"
-                    />
-                    <View
-                      style={[
-                        styles.serviceOverlay,
-                        { backgroundColor: service.color },
-                      ]}
-                    >
-                      <ResponsiveText
-                        variant="body2"
-                        weight="bold"
-                        color={COLORS.white}
-                      >
-                        {service.title}
-                      </ResponsiveText>
-                    </View>
-                  </View>
-                  <ResponsiveText
-                    variant="caption1"
-                    weight="medium"
-                    color={COLORS.text.primary}
-                    style={styles.serviceTitle}
+              {favoriteServices.map((service) => {
+                console.log(
+                  "UserHomeScreen: Mapping favorite service:",
+                  service
+                );
+                return (
+                  <TouchableOpacity
+                    key={service.id}
+                    style={styles.favoriteServiceCard}
                   >
-                    {service.title}
-                  </ResponsiveText>
-                </TouchableOpacity>
-              ))}
+                    <View style={styles.serviceImageContainer}>
+                      <Image
+                        source={service.image}
+                        style={styles.serviceImage}
+                        resizeMode="cover"
+                      />
+                      <View
+                        style={[
+                          styles.serviceOverlay,
+                          { backgroundColor: service.color },
+                        ]}
+                      >
+                        <ResponsiveText
+                          variant="body2"
+                          weight="bold"
+                          color={COLORS.white}
+                        >
+                          {service.title}
+                        </ResponsiveText>
+                      </View>
+                    </View>
+                    <ResponsiveText
+                      variant="caption1"
+                      weight="medium"
+                      color={COLORS.text.primary}
+                      style={styles.serviceTitle}
+                    >
+                      {service.title}
+                    </ResponsiveText>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
 
           {/* Service Categories Grid */}
           <View style={styles.section}>
             <View style={styles.categoriesGrid}>
-              {serviceCategories.map((category) => (
-                <TouchableOpacity key={category.id} style={styles.categoryItem}>
-                  <View
-                    style={[
-                      styles.categoryIcon,
-                      { backgroundColor: category.color },
-                    ]}
+              {serviceCategories.map((category) => {
+                console.log(
+                  "UserHomeScreen: Mapping service category:",
+                  category
+                );
+                return (
+                  <TouchableOpacity
+                    key={category.id}
+                    style={styles.categoryItem}
                   >
-                    <Ionicons
-                      name={category.icon as any}
-                      size={24}
-                      color={COLORS.white}
-                    />
-                  </View>
-                  <ResponsiveText
-                    variant="caption1"
-                    weight="medium"
-                    color={COLORS.text.primary}
-                    style={styles.categoryTitle}
-                  >
-                    {category.title}
-                  </ResponsiveText>
-                </TouchableOpacity>
-              ))}
+                    <View
+                      style={[
+                        styles.categoryIcon,
+                        { backgroundColor: category.color },
+                      ]}
+                    >
+                      <Ionicons
+                        name={category.icon as any}
+                        size={24}
+                        color={COLORS.white}
+                      />
+                    </View>
+                    <ResponsiveText
+                      variant="caption1"
+                      weight="medium"
+                      color={COLORS.text.primary}
+                      style={styles.categoryTitle}
+                    >
+                      {category.title}
+                    </ResponsiveText>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
@@ -393,6 +440,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     justifyContent: "center",
     alignItems: "center",
+  },
+  profileImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: COLORS.white,
   },
   searchContainer: {
     paddingHorizontal: PADDING.screen,

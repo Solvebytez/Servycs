@@ -29,52 +29,16 @@ import {
   ReviewDetailsModal,
 } from "../../../components";
 import { userService, UserProfile } from "../../../services/user";
+import { useUser } from "../../../hooks/useUser";
 
 export default function VendorDashboardScreen() {
+  console.log("VendorDashboardScreen: Component rendering");
   const router = useRouter();
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
-  const [selectedReview, setSelectedReview] = useState(null);
+  const [selectedReview, setSelectedReview] = useState<any>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
-  // Fetch user profile data
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        setIsLoadingUser(true);
-        // TODO: Implement actual API call when backend is ready
-        // const userProfile = await userService.getProfile();
-        // setUser(userProfile);
-
-        // Mock user data for UI development
-        setUser({
-          id: "1",
-          name: "Vendor User",
-          email: "vendor@example.com",
-          role: "vendor",
-          avatar:
-            "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face&auto=format",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      } catch (error) {
-        console.error("Error fetching user profile:", error);
-        // Set fallback user data if API fails
-        setUser({
-          id: "1",
-          name: "Vendor User",
-          email: "vendor@example.com",
-          role: "vendor",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-
-    fetchUserProfile();
-  }, []);
+  // Use React Query to fetch user data
+  const { data: user, isLoading: isLoadingUser, error } = useUser();
 
   // Handle profile button press
   const handleProfilePress = () => {
@@ -223,7 +187,12 @@ export default function VendorDashboardScreen() {
                 </TouchableOpacity>
                 <UserProfileButton
                   user={
-                    user ? { name: user.name, avatar: user.avatar } : undefined
+                    user
+                      ? {
+                          name: (user as any).name,
+                          avatar: (user as any).avatar,
+                        }
+                      : undefined
                   }
                   size={40}
                   onPress={handleProfilePress}

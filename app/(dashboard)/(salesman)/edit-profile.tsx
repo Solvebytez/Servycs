@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -22,6 +22,11 @@ import {
   BackButton,
 } from "@/components";
 import { COLORS, FONT_SIZE, MARGIN, PADDING, BORDER_RADIUS } from "@/constants";
+import {
+  useProfile,
+  useUpdateProfile,
+  isSalesmanProfile,
+} from "../../../hooks/useProfile";
 
 // Validation schema for salesman profile
 const salesmanProfileSchema = yup.object({
@@ -34,7 +39,13 @@ const salesmanProfileSchema = yup.object({
     .string()
     .required("Phone number is required")
     .min(10, "Phone must be at least 10 digits"),
-  address: yup.string().min(10, "Address must be at least 10 characters"),
+  primaryAddress: yup
+    .string()
+    .min(10, "Address must be at least 10 characters"),
+  primaryCity: yup.string().required("City is required"),
+  primaryState: yup.string().required("State is required"),
+  primaryZipCode: yup.string().required("Zip code is required"),
+  primaryCountry: yup.string().required("Country is required"),
   bio: yup.string().max(500, "Bio must be less than 500 characters"),
   employeeId: yup.string().required("Employee ID is required"),
 });
@@ -43,24 +54,54 @@ type SalesmanProfileFormData = yup.InferType<typeof salesmanProfileSchema>;
 
 export default function SalesmanEditProfileScreen() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+
+  // Use TanStack Query hooks
+  const {
+    data: profileData,
+    isLoading: isLoadingProfile,
+    error: profileError,
+  } = useProfile();
+  const updateProfileMutation = useUpdateProfile();
 
   const {
     control,
     handleSubmit,
     formState: { errors, isValid },
+    reset,
   } = useForm<SalesmanProfileFormData>({
     resolver: yupResolver(salesmanProfileSchema),
     mode: "onChange",
     defaultValues: {
-      name: "Salesman User",
-      email: "salesman@example.com",
-      phone: "+91 9876543210",
-      address: "123 Sales Street, City, State 12345",
-      bio: "Professional salesman driving business growth",
-      employeeId: "EMP001",
+      name: "",
+      email: "",
+      phone: "",
+      primaryAddress: "",
+      primaryCity: "",
+      primaryState: "",
+      primaryZipCode: "",
+      primaryCountry: "India",
+      bio: "",
+      employeeId: "",
     },
   });
+
+  // Update form when profile data is loaded
+  useEffect(() => {
+    if (profileData && isSalesmanProfile(profileData)) {
+      reset({
+        name: profileData.name || "",
+        email: profileData.email || "",
+        phone: profileData.phone || "",
+        primaryAddress: profileData.primaryAddress || "",
+        primaryCity: profileData.primaryCity || "",
+        primaryState: profileData.primaryState || "",
+        primaryZipCode: profileData.primaryZipCode || "",
+        primaryCountry: profileData.primaryCountry || "India",
+        bio: profileData.bio || "",
+        employeeId: profileData.employeeId || "",
+      });
+    }
+  }, [profileData, reset]);
 
   const handleImagePicker = () => {
     // TODO: Implement image picker functionality
@@ -72,11 +113,9 @@ export default function SalesmanEditProfileScreen() {
 
   const onSubmit = async (data: SalesmanProfileFormData) => {
     try {
-      setIsLoading(true);
       console.log("Salesman profile data:", data);
 
-      // TODO: Implement API call to update salesman profile
-      // await userService.updateProfile(data);
+      await updateProfileMutation.mutateAsync(data);
 
       Alert.alert("Success", "Profile updated successfully", [
         { text: "OK", onPress: () => router.back() },
@@ -84,8 +123,6 @@ export default function SalesmanEditProfileScreen() {
     } catch (error) {
       console.error("Error updating profile:", error);
       Alert.alert("Error", "Failed to update profile. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -333,7 +370,7 @@ export default function SalesmanEditProfileScreen() {
               Additional Information
             </ResponsiveText>
 
-            {/* Address Field */}
+            {/* Primary Address Fields */}
             <View style={styles.inputGroup}>
               <ResponsiveText
                 variant="inputLabel"
@@ -341,33 +378,187 @@ export default function SalesmanEditProfileScreen() {
                 color={COLORS.text.primary}
                 style={styles.inputLabel}
               >
-                Address
+                Primary Address
               </ResponsiveText>
               <Controller
                 control={control}
-                name="address"
+                name="primaryAddress"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <TextInput
                     style={[
                       styles.textInput,
                       styles.textArea,
-                      errors.address && styles.inputError,
+                      errors.primaryAddress && styles.inputError,
                     ]}
                     onBlur={onBlur}
                     onChangeText={onChange}
                     value={value}
-                    placeholder="Enter your address (optional)"
+                    placeholder="Enter your primary address"
                     placeholderTextColor={COLORS.text.secondary}
                     multiline
-                    numberOfLines={3}
+                    numberOfLines={2}
                   />
                 )}
               />
-              {errors.address && (
+              {errors.primaryAddress && (
                 <ResponsiveText variant="inputHelper" color={COLORS.error[500]}>
-                  {errors.address.message}
+                  {errors.primaryAddress.message}
                 </ResponsiveText>
               )}
+            </View>
+
+            {/* City, State, Zip Code Row */}
+            <View style={styles.rowContainer}>
+              <View style={[styles.inputGroup, styles.flex1]}>
+                <ResponsiveText
+                  variant="inputLabel"
+                  weight="medium"
+                  color={COLORS.text.primary}
+                  style={styles.inputLabel}
+                >
+                  City
+                </ResponsiveText>
+                <Controller
+                  control={control}
+                  name="primaryCity"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        errors.primaryCity && styles.inputError,
+                      ]}
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      value={value}
+                      placeholder="City"
+                      placeholderTextColor={COLORS.text.secondary}
+                    />
+                  )}
+                />
+                {errors.primaryCity && (
+                  <ResponsiveText
+                    variant="inputHelper"
+                    color={COLORS.error[500]}
+                  >
+                    {errors.primaryCity.message}
+                  </ResponsiveText>
+                )}
+              </View>
+
+              <View
+                style={[styles.inputGroup, styles.flex1, { marginLeft: 10 }]}
+              >
+                <ResponsiveText
+                  variant="inputLabel"
+                  weight="medium"
+                  color={COLORS.text.primary}
+                  style={styles.inputLabel}
+                >
+                  State
+                </ResponsiveText>
+                <Controller
+                  control={control}
+                  name="primaryState"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        errors.primaryState && styles.inputError,
+                      ]}
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      value={value}
+                      placeholder="State"
+                      placeholderTextColor={COLORS.text.secondary}
+                    />
+                  )}
+                />
+                {errors.primaryState && (
+                  <ResponsiveText
+                    variant="inputHelper"
+                    color={COLORS.error[500]}
+                  >
+                    {errors.primaryState.message}
+                  </ResponsiveText>
+                )}
+              </View>
+            </View>
+
+            {/* Zip Code and Country Row */}
+            <View style={styles.rowContainer}>
+              <View style={[styles.inputGroup, styles.flex1]}>
+                <ResponsiveText
+                  variant="inputLabel"
+                  weight="medium"
+                  color={COLORS.text.primary}
+                  style={styles.inputLabel}
+                >
+                  Zip Code
+                </ResponsiveText>
+                <Controller
+                  control={control}
+                  name="primaryZipCode"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        errors.primaryZipCode && styles.inputError,
+                      ]}
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      value={value}
+                      placeholder="Zip Code"
+                      placeholderTextColor={COLORS.text.secondary}
+                    />
+                  )}
+                />
+                {errors.primaryZipCode && (
+                  <ResponsiveText
+                    variant="inputHelper"
+                    color={COLORS.error[500]}
+                  >
+                    {errors.primaryZipCode.message}
+                  </ResponsiveText>
+                )}
+              </View>
+
+              <View
+                style={[styles.inputGroup, styles.flex1, { marginLeft: 10 }]}
+              >
+                <ResponsiveText
+                  variant="inputLabel"
+                  weight="medium"
+                  color={COLORS.text.primary}
+                  style={styles.inputLabel}
+                >
+                  Country
+                </ResponsiveText>
+                <Controller
+                  control={control}
+                  name="primaryCountry"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        errors.primaryCountry && styles.inputError,
+                      ]}
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      value={value}
+                      placeholder="Country"
+                      placeholderTextColor={COLORS.text.secondary}
+                    />
+                  )}
+                />
+                {errors.primaryCountry && (
+                  <ResponsiveText
+                    variant="inputHelper"
+                    color={COLORS.error[500]}
+                  >
+                    {errors.primaryCountry.message}
+                  </ResponsiveText>
+                )}
+              </View>
             </View>
 
             {/* Bio Field */}
@@ -424,12 +615,16 @@ export default function SalesmanEditProfileScreen() {
             />
 
             <ResponsiveButton
-              title={isLoading ? "Saving..." : "Save Changes"}
+              title={
+                updateProfileMutation.isPending ? "Saving..." : "Save Changes"
+              }
               variant="primary"
               size="medium"
               fullWidth
               onPress={handleSubmit(onSubmit)}
-              disabled={!isValid || isLoading}
+              disabled={
+                !isValid || updateProfileMutation.isPending || isLoadingProfile
+              }
               style={styles.saveButton}
             />
           </View>
@@ -547,5 +742,12 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: 8,
+  },
+  rowContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  flex1: {
+    flex: 1,
   },
 });

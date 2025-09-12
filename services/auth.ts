@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { api, tokenAuthApi } from "./api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Auth service interface
@@ -32,15 +32,15 @@ export interface AuthResponse {
 
 // Auth service functions
 export const authService = {
-  // Login user
+  // Login user (password-based)
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     const response = await api.post<AuthResponse>("/auth/login", credentials);
     return response.data;
   },
 
-  // Register user
+  // Register user (token-based)
   register: async (data: RegisterData): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>("/auth/register", data);
+    const response = await tokenAuthApi.post<AuthResponse>("/register", data);
     return response.data;
   },
 
@@ -84,6 +84,24 @@ export const authService = {
       token,
       newPassword,
     });
+    return response.data;
+  },
+
+  // Send OTP for email verification
+  sendOTP: async (email: string) => {
+    const response = await api.post("/auth/send-otp", { email });
+    return response.data;
+  },
+
+  // Verify OTP code
+  verifyOTP: async (email: string, otpCode: string) => {
+    const response = await api.post("/auth/verify-otp", { email, otpCode });
+    return response.data;
+  },
+
+  // Resend OTP
+  resendOTP: async (email: string) => {
+    const response = await api.post("/auth/resend-otp", { email });
     return response.data;
   },
 };

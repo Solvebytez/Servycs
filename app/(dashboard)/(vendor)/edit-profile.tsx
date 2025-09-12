@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -19,7 +19,7 @@ import {
   ResponsiveCard,
   ResponsiveButton,
   GlobalStatusBar,
-  BackButton,
+  AppHeader,
 } from "@/components";
 import {
   COLORS,
@@ -30,14 +30,15 @@ import {
   BORDER_RADIUS,
   LAYOUT,
 } from "@/constants";
+import {
+  useProfile,
+  useUpdateProfile,
+  isVendorProfile,
+  BusinessAddress,
+} from "../../../hooks/useProfile";
+import { useUser } from "../../../hooks/useUser";
 
-// Business address type
-type BusinessAddress = {
-  id: string;
-  name: string;
-  address: string;
-  description: string;
-};
+// Remove duplicate BusinessAddress type since it's imported from useProfile
 
 // Validation schema for vendor profile
 const vendorProfileSchema = yup.object({
@@ -50,70 +51,114 @@ const vendorProfileSchema = yup.object({
     .string()
     .required("Phone number is required")
     .min(10, "Phone must be at least 10 digits"),
-  businessAddresses: yup
-    .array()
-    .of(
-      yup.object({
-        id: yup.string().required(),
-        name: yup
-          .string()
-          .required("Business name is required")
-          .min(2, "Business name must be at least 2 characters"),
-        address: yup
-          .string()
-          .required("Address is required")
-          .min(10, "Address must be at least 10 characters"),
-        description: yup
-          .string()
-          .max(500, "Description must be less than 500 characters"),
-      })
-    )
-    .min(1, "At least one business address is required")
-    .required("Business addresses are required"),
+  businessName: yup.string().required("Business name is required"),
+  businessAddress: yup.string().required("Landmark is required"),
+  businessCity: yup.string().required("Business city is required"),
+  businessState: yup.string().required("Business state is required"),
+  businessZipCode: yup.string().required("Business zip code is required"),
+  businessCountry: yup.string().required("Business country is required"),
+  businessDescription: yup
+    .string()
+    .max(500, "Description must be less than 500 characters")
+    .optional(),
 });
 
-type VendorProfileFormData = yup.InferType<typeof vendorProfileSchema>;
+type VendorProfileFormData = {
+  name: string;
+  email: string;
+  phone: string;
+  businessName: string;
+  businessAddress: string;
+  businessCity: string;
+  businessState: string;
+  businessZipCode: string;
+  businessCountry: string;
+  businessDescription?: string;
+};
 
 export default function VendorEditProfileScreen() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [businessAddresses, setBusinessAddresses] = useState<BusinessAddress[]>(
-    [
-      {
-        id: "1",
-        name: "My Business",
-        address: "123 Business Street, City, State 12345",
-        description: "Professional vendor providing quality services",
-      },
-    ]
-  );
+  const [additionalAddresses, setAdditionalAddresses] = useState<number[]>([]);
+
+  // Functions to handle additional addresses
+  const addAdditionalAddress = () => {
+    const newId = Date.now(); // Use timestamp as unique ID
+    setAdditionalAddresses((prev) => [...prev, newId]);
+  };
+
+  const removeAdditionalAddress = (id: number) => {
+    setAdditionalAddresses((prev) =>
+      prev.filter((addressId) => addressId !== id)
+    );
+  };
+
+  // Use TanStack Query hooks
+  const {
+    data: profileData,
+    isLoading: isLoadingProfile,
+    error: profileError,
+  } = useProfile();
+  const updateProfileMutation = useUpdateProfile();
+
+  // Also get user data to check role
+  const { data: userData } = useUser();
 
   const {
     control,
     handleSubmit,
     formState: { errors, isValid },
-    setValue,
-    watch,
+    reset,
   } = useForm<VendorProfileFormData>({
-    resolver: yupResolver(vendorProfileSchema),
+    resolver: yupResolver(vendorProfileSchema) as any,
     mode: "onChange",
     defaultValues: {
-      name: "Vendor User",
-      email: "vendor@example.com",
-      phone: "+91 9876543210",
-      businessAddresses: [
-        {
-          id: "1",
-          name: "My Business",
-          address: "123 Business Street, City, State 12345",
-          description: "Professional vendor providing quality services",
-        },
-      ],
+      name: "",
+      email: "",
+      phone: "",
+      businessName: "",
+      businessAddress: "",
+      businessCity: "",
+      businessState: "",
+      businessZipCode: "",
+      businessCountry: "India",
+      businessDescription: "",
     },
   });
 
-  // Watch business addresses for form validation
-  const watchedAddresses = watch("businessAddresses");
+  // Update form when profile data is loaded
+  useEffect(() => {
+    console.log("=== Vendor Edit Profile: useEffect triggered ===");
+    console.log("profileData:", profileData);
+    console.log("profileData?.role:", profileData?.role);
+    console.log("userData:", userData);
+    console.log("userData?.role:", userData?.role);
+    console.log(
+      "isVendorProfile(profileData):",
+      profileData ? isVendorProfile(profileData) : false
+    );
+    console.log("isLoadingProfile:", isLoadingProfile);
+    console.log("profileError:", profileError);
+
+    // Always reset the form with whatever data we have, regardless of type guard
+    if (profileData) {
+      console.log(
+        "=== Vendor Edit Profile: Resetting form with data ===",
+        profileData
+      );
+      reset({
+        name: profileData.name || "",
+        email: profileData.email || "",
+        phone: profileData.phone || "",
+        businessName: (profileData as any).businessName || "",
+        businessAddress: (profileData as any).businessAddress || "",
+        businessCity: (profileData as any).businessCity || "",
+        businessState: (profileData as any).businessState || "",
+        businessZipCode: (profileData as any).businessZipCode || "",
+        businessCountry: (profileData as any).businessCountry || "India",
+        businessDescription: (profileData as any).businessDescription || "",
+      });
+    }
+  }, [profileData, reset]);
 
   const handleImagePicker = () => {
     // TODO: Implement image picker functionality
@@ -123,51 +168,11 @@ export default function VendorEditProfileScreen() {
     );
   };
 
-  const addNewAddress = () => {
-    const newAddress: BusinessAddress = {
-      id: Date.now().toString(),
-      name: "",
-      address: "",
-      description: "",
-    };
-    const updatedAddresses = [...businessAddresses, newAddress];
-    setBusinessAddresses(updatedAddresses);
-    setValue("businessAddresses", updatedAddresses);
-  };
-
-  const removeAddress = (id: string) => {
-    if (businessAddresses.length <= 1) {
-      Alert.alert(
-        "Cannot Remove",
-        "You must have at least one business address."
-      );
-      return;
-    }
-
-    const updatedAddresses = businessAddresses.filter((addr) => addr.id !== id);
-    setBusinessAddresses(updatedAddresses);
-    setValue("businessAddresses", updatedAddresses);
-  };
-
-  const updateAddress = (
-    id: string,
-    field: keyof BusinessAddress,
-    value: string
-  ) => {
-    const updatedAddresses = businessAddresses.map((addr) =>
-      addr.id === id ? { ...addr, [field]: value } : addr
-    );
-    setBusinessAddresses(updatedAddresses);
-    setValue("businessAddresses", updatedAddresses);
-  };
-
-  const onSubmit = async (data: VendorProfileFormData) => {
+  const onSubmit = async (data: any) => {
     try {
-      setIsLoading(true);
       console.log("Vendor profile data:", data);
 
-      // TODO: Implement API call to update vendor profile
-      // await userService.updateProfile(data);
+      await updateProfileMutation.mutateAsync(data);
 
       Alert.alert("Success", "Profile updated successfully", [
         { text: "OK", onPress: () => router.back() },
@@ -175,8 +180,6 @@ export default function VendorEditProfileScreen() {
     } catch (error) {
       console.error("Error updating profile:", error);
       Alert.alert("Error", "Failed to update profile. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -194,27 +197,12 @@ export default function VendorEditProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <GlobalStatusBar />
-      {/* Header with Solid Background */}
-      <View style={styles.headerSolid}>
-        {/* Top Navigation */}
-        <View style={styles.topNavigation}>
-          <BackButton
-            onPress={handleCancel}
-            variant="default"
-            size="medium"
-            showText={false}
-            showIcon={true}
-            iconName="arrow-back"
-          />
-          <ResponsiveText variant="h5" weight="bold" color={COLORS.white}>
-            Edit Profile
-          </ResponsiveText>
-          <View style={styles.placeholder} />
-        </View>
-      </View>
+      {/* Header */}
+      <AppHeader onBackPress={handleCancel} title="Edit Profile" />
 
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Picture Section */}
@@ -374,190 +362,450 @@ export default function VendorEditProfileScreen() {
             Business Information
           </ResponsiveText>
 
-          {/* Business Addresses Section */}
+          {/* Business Information Section */}
           <View style={styles.inputGroup}>
-            <View style={styles.addressesHeader}>
-              <ResponsiveButton
-                title="Add New Address"
-                variant="outline"
-                size="small"
-                onPress={addNewAddress}
-                leftIcon={
-                  <Ionicons name="add" size={16} color={COLORS.primary[300]} />
-                }
-                style={styles.addAddressButton}
-                textStyle={styles.addAddressButtonText}
+            <ResponsiveText
+              variant="inputLabel"
+              weight="medium"
+              color={COLORS.text.primary}
+              style={styles.inputLabel}
+            >
+              Business Name
+            </ResponsiveText>
+            <Controller
+              control={control}
+              name="businessName"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    errors.businessName && styles.inputError,
+                  ]}
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                  value={value}
+                  placeholder="Enter your business name"
+                  placeholderTextColor={COLORS.text.secondary}
+                />
+              )}
+            />
+            {errors.businessName && (
+              <ResponsiveText variant="inputHelper" color={COLORS.error[500]}>
+                {errors.businessName.message}
+              </ResponsiveText>
+            )}
+          </View>
+
+          {/* City, State, Zip Code Row */}
+          <View style={styles.rowContainer}>
+            <View style={[styles.inputGroup, styles.flex1]}>
+              <ResponsiveText
+                variant="inputLabel"
+                weight="medium"
+                color={COLORS.text.primary}
+                style={styles.inputLabel}
+              >
+                City
+              </ResponsiveText>
+              <Controller
+                control={control}
+                name="businessCity"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    style={[
+                      styles.textInput,
+                      errors.businessCity && styles.inputError,
+                    ]}
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    placeholder="City"
+                    placeholderTextColor={COLORS.text.secondary}
+                  />
+                )}
               />
+              {errors.businessCity && (
+                <ResponsiveText variant="inputHelper" color={COLORS.error[500]}>
+                  {errors.businessCity.message}
+                </ResponsiveText>
+              )}
             </View>
 
-            {businessAddresses.map((address, index) => (
-              <View key={address.id} style={styles.addressCard}>
-                <View style={styles.addressHeader}>
-                  <ResponsiveText
-                    variant="caption1"
-                    weight="medium"
-                    color={COLORS.text.secondary}
-                  >
-                    Address {index + 1}
-                  </ResponsiveText>
-                  {businessAddresses.length > 1 && (
-                    <TouchableOpacity
-                      onPress={() => removeAddress(address.id)}
-                      style={styles.removeButton}
-                    >
-                      <Ionicons
-                        name="close-circle"
-                        size={20}
-                        color={COLORS.error[500]}
-                      />
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {/* Business Name for this address */}
-                <View style={styles.addressInputGroup}>
-                  <ResponsiveText
-                    variant="caption2"
-                    weight="medium"
-                    color={COLORS.text.primary}
-                    style={styles.addressInputLabel}
-                  >
-                    Business Name *
-                  </ResponsiveText>
+            <View style={[styles.inputGroup, styles.flex1, { marginLeft: 10 }]}>
+              <ResponsiveText
+                variant="inputLabel"
+                weight="medium"
+                color={COLORS.text.primary}
+                style={styles.inputLabel}
+              >
+                State
+              </ResponsiveText>
+              <Controller
+                control={control}
+                name="businessState"
+                render={({ field: { onChange, onBlur, value } }) => (
                   <TextInput
                     style={[
                       styles.textInput,
-                      styles.addressInput,
-                      errors.businessAddresses?.[index]?.name &&
-                        styles.inputError,
+                      errors.businessState && styles.inputError,
                     ]}
-                    onChangeText={(value) =>
-                      updateAddress(address.id, "name", value)
-                    }
-                    value={address.name}
-                    placeholder="Enter business name for this address"
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    placeholder="State"
                     placeholderTextColor={COLORS.text.secondary}
                   />
-                  {errors.businessAddresses?.[index]?.name && (
-                    <ResponsiveText
-                      variant="inputHelper"
-                      color={COLORS.error[500]}
-                    >
-                      {errors.businessAddresses[index].name.message}
-                    </ResponsiveText>
-                  )}
-                </View>
+                )}
+              />
+              {errors.businessState && (
+                <ResponsiveText variant="inputHelper" color={COLORS.error[500]}>
+                  {errors.businessState.message}
+                </ResponsiveText>
+              )}
+            </View>
+          </View>
 
-                {/* Address for this business */}
-                <View style={styles.addressInputGroup}>
-                  <ResponsiveText
-                    variant="caption2"
-                    weight="medium"
-                    color={COLORS.text.primary}
-                    style={styles.addressInputLabel}
-                  >
-                    Address *
-                  </ResponsiveText>
+          {/* Zip Code and Country Row */}
+          <View style={styles.rowContainer}>
+            <View style={[styles.inputGroup, styles.flex1]}>
+              <ResponsiveText
+                variant="inputLabel"
+                weight="medium"
+                color={COLORS.text.primary}
+                style={styles.inputLabel}
+              >
+                Zip Code
+              </ResponsiveText>
+              <Controller
+                control={control}
+                name="businessZipCode"
+                render={({ field: { onChange, onBlur, value } }) => (
                   <TextInput
                     style={[
                       styles.textInput,
-                      styles.textArea,
-                      styles.addressInput,
-                      errors.businessAddresses?.[index]?.address &&
-                        styles.inputError,
+                      errors.businessZipCode && styles.inputError,
                     ]}
-                    onChangeText={(value) =>
-                      updateAddress(address.id, "address", value)
-                    }
-                    value={address.address}
-                    placeholder="Enter the business address"
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    placeholder="Zip Code"
                     placeholderTextColor={COLORS.text.secondary}
-                    multiline
-                    numberOfLines={3}
                   />
-                  {errors.businessAddresses?.[index]?.address && (
-                    <ResponsiveText
-                      variant="inputHelper"
-                      color={COLORS.error[500]}
-                    >
-                      {errors.businessAddresses[index].address.message}
-                    </ResponsiveText>
-                  )}
-                </View>
+                )}
+              />
+              {errors.businessZipCode && (
+                <ResponsiveText variant="inputHelper" color={COLORS.error[500]}>
+                  {errors.businessZipCode.message}
+                </ResponsiveText>
+              )}
+            </View>
 
-                {/* Business Description for this address */}
-                <View style={styles.addressInputGroup}>
-                  <ResponsiveText
-                    variant="caption2"
-                    weight="medium"
-                    color={COLORS.text.primary}
-                    style={styles.addressInputLabel}
-                  >
-                    Business Description
-                  </ResponsiveText>
+            <View style={[styles.inputGroup, styles.flex1, { marginLeft: 10 }]}>
+              <ResponsiveText
+                variant="inputLabel"
+                weight="medium"
+                color={COLORS.text.primary}
+                style={styles.inputLabel}
+              >
+                Country
+              </ResponsiveText>
+              <Controller
+                control={control}
+                name="businessCountry"
+                render={({ field: { onChange, onBlur, value } }) => (
                   <TextInput
                     style={[
                       styles.textInput,
-                      styles.textArea,
-                      styles.addressInput,
-                      errors.businessAddresses?.[index]?.description &&
-                        styles.inputError,
+                      errors.businessCountry && styles.inputError,
                     ]}
-                    onChangeText={(value) =>
-                      updateAddress(address.id, "description", value)
-                    }
-                    value={address.description}
-                    placeholder="Describe this business location (optional)"
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    placeholder="Country"
                     placeholderTextColor={COLORS.text.secondary}
-                    multiline
-                    numberOfLines={4}
                   />
-                  {errors.businessAddresses?.[index]?.description && (
-                    <ResponsiveText
-                      variant="inputHelper"
-                      color={COLORS.error[500]}
-                    >
-                      {errors.businessAddresses[index].description.message}
-                    </ResponsiveText>
-                  )}
-                </View>
-              </View>
-            ))}
+                )}
+              />
+              {errors.businessCountry && (
+                <ResponsiveText variant="inputHelper" color={COLORS.error[500]}>
+                  {errors.businessCountry.message}
+                </ResponsiveText>
+              )}
+            </View>
+          </View>
 
-            {errors.businessAddresses && (
+          <View style={styles.inputGroup}>
+            <ResponsiveText
+              variant="inputLabel"
+              weight="medium"
+              color={COLORS.text.primary}
+              style={styles.inputLabel}
+            >
+              Business Description
+            </ResponsiveText>
+            <Controller
+              control={control}
+              name="businessDescription"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    styles.textArea,
+                    errors.businessDescription && styles.inputError,
+                  ]}
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                  value={value}
+                  placeholder="Describe your business (optional)"
+                  placeholderTextColor={COLORS.text.secondary}
+                  multiline
+                  numberOfLines={4}
+                />
+              )}
+            />
+            {errors.businessDescription && (
               <ResponsiveText variant="inputHelper" color={COLORS.error[500]}>
-                {errors.businessAddresses.message}
+                {errors.businessDescription.message}
+              </ResponsiveText>
+            )}
+          </View>
+
+          {/* Landmark Field */}
+          <View style={styles.inputGroup}>
+            <ResponsiveText
+              variant="inputLabel"
+              weight="medium"
+              color={COLORS.text.primary}
+              style={styles.inputLabel}
+            >
+              Landmark
+            </ResponsiveText>
+            <Controller
+              control={control}
+              name="businessAddress"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    styles.textArea,
+                    errors.businessAddress && styles.inputError,
+                  ]}
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                  value={value}
+                  placeholder="Enter your landmark"
+                  placeholderTextColor={COLORS.text.secondary}
+                  multiline
+                  numberOfLines={2}
+                />
+              )}
+            />
+            {errors.businessAddress && (
+              <ResponsiveText variant="inputHelper" color={COLORS.error[500]}>
+                {errors.businessAddress.message}
               </ResponsiveText>
             )}
           </View>
         </ResponsiveCard>
 
-        {/* Action Buttons */}
+        {/* Additional Address Cards */}
+        {additionalAddresses.map((addressId, index) => (
+          <ResponsiveCard
+            key={addressId}
+            variant="elevated"
+            style={styles.formCard}
+          >
+            <View style={styles.additionalAddressHeader}>
+              <ResponsiveText
+                variant="h6"
+                weight="bold"
+                color={COLORS.text.primary}
+                style={styles.sectionTitle}
+              >
+                Business Information {index + 2}
+              </ResponsiveText>
+              <TouchableOpacity
+                onPress={() => removeAdditionalAddress(addressId)}
+                style={styles.removeAddressButton}
+              >
+                <Ionicons name="close" size={20} color={COLORS.error[500]} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Business Name */}
+            <View style={styles.inputGroup}>
+              <ResponsiveText
+                variant="inputLabel"
+                weight="medium"
+                color={COLORS.text.primary}
+                style={styles.inputLabel}
+              >
+                Business Name
+              </ResponsiveText>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Enter your business name"
+                placeholderTextColor={COLORS.text.secondary}
+              />
+            </View>
+
+            {/* City, State, Zip Code Row */}
+            <View style={styles.rowContainer}>
+              <View style={[styles.inputGroup, styles.flex1]}>
+                <ResponsiveText
+                  variant="inputLabel"
+                  weight="medium"
+                  color={COLORS.text.primary}
+                  style={styles.inputLabel}
+                >
+                  City
+                </ResponsiveText>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="City"
+                  placeholderTextColor={COLORS.text.secondary}
+                />
+              </View>
+
+              <View
+                style={[styles.inputGroup, styles.flex1, { marginLeft: 10 }]}
+              >
+                <ResponsiveText
+                  variant="inputLabel"
+                  weight="medium"
+                  color={COLORS.text.primary}
+                  style={styles.inputLabel}
+                >
+                  State
+                </ResponsiveText>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="State"
+                  placeholderTextColor={COLORS.text.secondary}
+                />
+              </View>
+            </View>
+
+            <View style={styles.rowContainer}>
+              <View style={[styles.inputGroup, styles.flex1]}>
+                <ResponsiveText
+                  variant="inputLabel"
+                  weight="medium"
+                  color={COLORS.text.primary}
+                  style={styles.inputLabel}
+                >
+                  Zip Code
+                </ResponsiveText>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Zip Code"
+                  placeholderTextColor={COLORS.text.secondary}
+                />
+              </View>
+
+              <View
+                style={[styles.inputGroup, styles.flex1, { marginLeft: 10 }]}
+              >
+                <ResponsiveText
+                  variant="inputLabel"
+                  weight="medium"
+                  color={COLORS.text.primary}
+                  style={styles.inputLabel}
+                >
+                  Country
+                </ResponsiveText>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Country"
+                  placeholderTextColor={COLORS.text.secondary}
+                />
+              </View>
+            </View>
+
+            {/* Business Description */}
+            <View style={styles.inputGroup}>
+              <ResponsiveText
+                variant="inputLabel"
+                weight="medium"
+                color={COLORS.text.primary}
+                style={styles.inputLabel}
+              >
+                Business Description
+              </ResponsiveText>
+              <TextInput
+                style={[styles.textInput, styles.textArea]}
+                placeholder="Describe your business (optional)"
+                placeholderTextColor={COLORS.text.secondary}
+                multiline
+                numberOfLines={4}
+              />
+            </View>
+
+            {/* Landmark Field */}
+            <View style={styles.inputGroup}>
+              <ResponsiveText
+                variant="inputLabel"
+                weight="medium"
+                color={COLORS.text.primary}
+                style={styles.inputLabel}
+              >
+                Landmark
+              </ResponsiveText>
+              <TextInput
+                style={[styles.textInput, styles.textArea]}
+                placeholder="Enter your landmark"
+                placeholderTextColor={COLORS.text.secondary}
+                multiline
+                numberOfLines={2}
+              />
+            </View>
+          </ResponsiveCard>
+        ))}
+
+        {/* Add Multiple Address Button */}
+        <TouchableOpacity
+          style={styles.addAddressButton}
+          onPress={addAdditionalAddress}
+        >
+          <Ionicons name="add" size={20} color={COLORS.primary[600]} />
+          <ResponsiveText
+            variant="body2"
+            weight="medium"
+            color={COLORS.primary[600]}
+            style={styles.addAddressButtonText}
+          >
+            Add Multiple Address
+          </ResponsiveText>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* Fixed Footer Action Buttons */}
+      <View style={styles.fixedFooter}>
         <View style={styles.buttonContainer}>
           <ResponsiveButton
             title="Cancel"
             variant="outline"
             size="medium"
-            fullWidth
             onPress={handleCancel}
             leftIcon={
               <Ionicons name="close" size={20} color={COLORS.error[500]} />
             }
-            style={styles.cancelButton}
+            style={[styles.cancelButton, styles.halfWidthButton] as any}
             textStyle={styles.cancelButtonText}
           />
 
           <ResponsiveButton
-            title={isLoading ? "Saving..." : "Save Changes"}
+            title={
+              updateProfileMutation.isPending ? "Saving..." : "Save Changes"
+            }
             variant="primary"
             size="medium"
-            fullWidth
             onPress={handleSubmit(onSubmit)}
-            disabled={!isValid || isLoading}
-            style={styles.saveButton}
+            disabled={updateProfileMutation.isPending || isLoadingProfile}
+            style={[styles.saveButton, styles.halfWidthButton] as any}
           />
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -567,26 +815,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background.primary,
   },
-  headerSolid: {
-    backgroundColor: COLORS.primary[200],
-    paddingTop: MARGIN.sm,
-    paddingBottom: MARGIN.md - 10,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  topNavigation: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: PADDING.screen,
-    marginBottom: MARGIN.sm,
-  },
-  placeholder: {
-    width: 40,
-  },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: PADDING.screen,
+    paddingBottom: 150, // Add padding for fixed footer
   },
   profileCard: {
     marginTop: MARGIN.lg,
@@ -656,15 +890,21 @@ const styles = StyleSheet.create({
     borderColor: COLORS.error[500],
   },
   buttonContainer: {
-    paddingVertical: MARGIN.xl,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: MARGIN.xs,
+    gap: MARGIN.md,
+  },
+  halfWidthButton: {
+    flex: 1,
+    minHeight: LAYOUT.buttonHeight,
+    paddingVertical: PADDING.button,
   },
   cancelButton: {
     borderColor: COLORS.error[500],
     borderWidth: 1,
     backgroundColor: COLORS.background.primary,
-    minHeight: LAYOUT.buttonHeight,
-    paddingVertical: PADDING.buttonLarge,
-    marginBottom: MARGIN.md,
   },
   cancelButtonText: {
     color: COLORS.error[500],
@@ -672,7 +912,7 @@ const styles = StyleSheet.create({
     lineHeight: LINE_HEIGHT.button,
   },
   saveButton: {
-    marginTop: MARGIN.xs,
+    // Size is handled by halfWidthButton
   },
   addressesHeader: {
     flexDirection: "row",
@@ -681,16 +921,20 @@ const styles = StyleSheet.create({
     marginBottom: MARGIN.md,
   },
   addAddressButton: {
-    borderColor: COLORS.primary[300],
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: MARGIN.md,
+    paddingHorizontal: MARGIN.lg,
     borderWidth: 1,
-    backgroundColor: COLORS.background.primary,
-    paddingHorizontal: PADDING.button,
-    paddingVertical: PADDING.buttonSmall,
-    minHeight: LAYOUT.buttonHeightSmall,
+    borderColor: COLORS.primary[600],
+    borderStyle: "dashed",
+    borderRadius: 8,
+    backgroundColor: COLORS.primary[50],
+    marginTop: MARGIN.md,
   },
   addAddressButtonText: {
-    color: COLORS.primary[300],
-    fontSize: FONT_SIZE.buttonSmall,
+    marginLeft: MARGIN.xs,
   },
   addressCard: {
     backgroundColor: COLORS.neutral[50],
@@ -717,5 +961,35 @@ const styles = StyleSheet.create({
   },
   addressInput: {
     backgroundColor: COLORS.background.primary,
+  },
+  rowContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  flex1: {
+    flex: 1,
+  },
+  additionalAddressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: MARGIN.lg,
+  },
+  removeAddressButton: {
+    padding: MARGIN.xs,
+    borderRadius: 20,
+    backgroundColor: COLORS.error[50],
+  },
+  fixedFooter: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.background.primary,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border.light,
+    paddingHorizontal: PADDING.screen,
+    paddingVertical: PADDING.md,
+    paddingBottom: PADDING.lg, // Extra padding for safe area
   },
 });

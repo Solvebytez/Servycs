@@ -34,6 +34,9 @@ export {
 // UserProfileButton component
 export { default as UserProfileButton } from "./UI/UserProfileButton";
 
+// AppHeader component
+export { default as AppHeader } from "./UI/AppHeader";
+
 // Global StatusBar component
 export { default as GlobalStatusBar } from "./StatusBar";
 

@@ -1,5 +1,12 @@
-import React, { useState } from "react";
-import { View, KeyboardAvoidingView, Platform, Image } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import {
@@ -18,11 +25,17 @@ import {
   responsiveScale,
 } from "@/constants";
 import { AuthHeader, AuthTabs, AuthForm, AuthButtons } from "./components";
+import {
+  authHandle,
+  registerHandle,
+  navigateToDashboard,
+} from "@/utils/authUtils";
 
 export default function AuthScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
+  const [isLoading, setIsLoading] = useState(false);
 
   const selectedRole = (params.role as string) || "user";
 
@@ -30,44 +43,89 @@ export default function AuthScreen() {
     setActiveTab(tab);
   };
 
-  const handleAuthSubmit = (
+  const handleAuthSubmit = async (
     email: string,
     password: string,
     confirmPassword?: string,
     fullName?: string,
     phone?: string
   ) => {
-    // TODO: Implement authentication logic
-    if (activeTab === "login") {
-      console.log("Login:", { email, password, selectedRole });
+    if (isLoading) return; // Prevent multiple submissions
 
-      // Temporarily redirect to vendor home screen for testing
-      // Later this will be dynamic based on user role and authentication status
-      router.replace("/(dashboard)/(vendor)/dashboard");
-    } else {
-      console.log("Signup:", {
-        email,
-        password,
-        confirmPassword,
-        fullName,
-        phone,
-        selectedRole,
-      });
+    setIsLoading(true);
 
-      // Temporarily redirect to vendor home screen for testing
-      // Later this will be dynamic based on user role and authentication status
-      router.replace("/(dashboard)/(vendor)/dashboard");
+    try {
+      const userData = {
+        name: fullName || email.split("@")[0] || "User",
+        email: email.toLowerCase().trim(),
+        avatar: "",
+        provider: "LOCAL" as const,
+        phone: phone || "", // Include phone field
+      };
+
+      let response;
+      if (activeTab === "login") {
+        console.log("Attempting login:", { email, selectedRole });
+        // Add password to userData for login
+        const loginUserData = {
+          ...userData,
+          password: password, // Include password for validation
+        };
+        response = await authHandle(loginUserData);
+      } else {
+        console.log("Attempting registration:", {
+          email,
+          fullName,
+          phone,
+          selectedRole,
+        });
+        // Add password to userData for registration
+        const registerUserData = {
+          ...userData,
+          password: password, // Include password for registration
+        };
+        response = await registerHandle(registerUserData);
+      }
+
+      if (response.success) {
+        console.log("Authentication successful:", response.data.user);
+
+        if (activeTab === "login") {
+          // For login, navigate to dashboard directly
+          const userRole = response.data.user.role || selectedRole;
+          navigateToDashboard(userRole);
+        } else {
+          // For registration, check if email verification is needed
+          const user = response.data.user;
+          if (user.provider === "LOCAL" && !user.isEmailVerified) {
+            // Redirect to OTP verification screen
+            router.push({
+              pathname: "/(auth)/otp-verification",
+              params: { email: user.email },
+            });
+          } else {
+            // Navigate to dashboard for verified users
+            const userRole = user.role || selectedRole;
+            navigateToDashboard(userRole);
+          }
+        }
+      } else {
+        throw new Error(response.message || "Authentication failed");
+      }
+    } catch (error: any) {
+      console.error("Authentication error:", error);
+      Alert.alert(
+        "Authentication Error",
+        error.message ||
+          "An error occurred during authentication. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleGooglePress = () => {
-    // TODO: Implement Google OAuth
-    console.log("Google OAuth pressed");
-
-    // Temporarily redirect to vendor home screen for testing
-    // Later this will be dynamic based on user role and authentication status
-    router.replace("/(dashboard)/(vendor)/dashboard");
-  };
+  // Google Sign-In is now handled by AuthButtons component
+  // No need for a separate handler here
 
   const handleBackToRoleSelection = () => {
     router.back();
@@ -129,9 +187,13 @@ export default function AuthScreen() {
                 width: "100%",
               }}
             >
-              <AuthForm activeTab={activeTab} onSubmit={handleAuthSubmit} />
+              <AuthForm
+                activeTab={activeTab}
+                isLoading={isLoading}
+                onSubmit={handleAuthSubmit}
+              />
 
-              <AuthButtons onGooglePress={handleGooglePress} />
+              <AuthButtons />
             </ResponsiveCard>
           </View>
         </LinearGradient>

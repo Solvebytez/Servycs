@@ -17,16 +17,7 @@ export {
 // ResponsiveCard components
 export {
   default as ResponsiveCard,
-  TouchableCard,
-  PrimaryCard,
-  SecondaryCard,
-  ElevatedCard,
-  OutlinedCard,
-  TransparentCard,
-  SmallCard,
-  LargeCard,
   type ResponsiveCardProps,
-  type TouchableCardProps,
   type CardVariant,
   type CardSize,
 } from "./ResponsiveCard";
@@ -34,17 +25,6 @@ export {
 // ResponsiveButton components
 export {
   default as ResponsiveButton,
-  PrimaryButton,
-  SecondaryButton,
-  OutlineButton,
-  GhostButton,
-  DangerButton,
-  SuccessButton,
-  WarningButton,
-  SmallButton,
-  LargeButton,
-  PillButton,
-  SquareButton,
   type ResponsiveButtonProps,
   type ButtonVariant,
   type ButtonSize,
@@ -53,6 +33,9 @@ export {
 
 // UserProfileButton component
 export { default as UserProfileButton } from "./UserProfileButton";
+
+// AppHeader component
+export { default as AppHeader } from "./AppHeader";
 
 // Re-export commonly used components for convenience
 export { ResponsiveText as Text } from "./ResponsiveText";

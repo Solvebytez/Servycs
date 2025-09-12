@@ -1,4 +1,4 @@
-import { api } from './api';
+import { api } from "./api";
 
 // User service interface
 export interface UserProfile {
@@ -26,19 +26,19 @@ export interface UpdateProfileData {
 export const userService = {
   // Get user profile
   getProfile: async (): Promise<UserProfile> => {
-    const response = await api.get<UserProfile>('/users/profile');
+    const response = await api.get<UserProfile>("/users/profile");
     return response.data;
   },
 
   // Update user profile
   updateProfile: async (data: UpdateProfileData): Promise<UserProfile> => {
-    const response = await api.put<UserProfile>('/users/profile', data);
+    const response = await api.put<UserProfile>("/users/profile", data);
     return response.data;
   },
 
   // Change password
   changePassword: async (currentPassword: string, newPassword: string) => {
-    const response = await api.post('/users/change-password', {
+    const response = await api.post("/users/change-password", {
       currentPassword,
       newPassword,
     });
@@ -47,9 +47,15 @@ export const userService = {
 
   // Delete account
   deleteAccount: async (password: string) => {
-    const response = await api.delete('/users/account', {
+    const response = await api.delete("/users/account", {
       data: { password },
     });
+    return response.data;
+  },
+
+  // Switch user role
+  switchRole: async (role: string) => {
+    const response = await api.post("/users/switch-role", { role });
     return response.data;
   },
 };

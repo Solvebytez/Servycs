@@ -32,8 +32,9 @@ export interface ProfileData {
   email: string;
   avatar?: string;
   role: "user" | "vendor" | "salesman";
+  status?: "ACTIVE" | "PENDING" | "INACTIVE" | "SUSPENDED" | "VERIFIED";
+  isEmailVerified?: boolean;
   businessName?: string; // For vendor/salesman
-  verificationStatus?: "verified" | "pending" | "unverified";
   phone?: string;
   address?: string;
 }
@@ -58,27 +59,41 @@ export interface ProfileScreenProps {
   onLogout: () => void;
   onEditAvatar?: () => void;
   title?: string;
+  roleSwitchOption?: SettingItem;
+  isLoggingOut?: boolean;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   profileData,
-  settings,
+  settings = [],
   additionalSettings = [],
   onEditProfile,
   onLogout,
   onEditAvatar,
   title = "Manage Account",
+  roleSwitchOption,
+  isLoggingOut = false,
 }) => {
   const router = useRouter();
 
-  const handleEditAvatar = () => {
-    if (onEditAvatar) {
-      onEditAvatar();
-    } else {
-      // Default behavior - just log
-      console.log("Edit avatar pressed");
-    }
-  };
+  // Debug logging
+  console.log("ProfileScreen render - profileData:", profileData);
+  console.log(
+    "ProfileScreen render - profileData.avatar:",
+    profileData?.avatar
+  );
+  console.log("ProfileScreen render - roleSwitchOption:", roleSwitchOption);
+  console.log("ProfileScreen render - settings:", settings);
+  console.log("ProfileScreen render - additionalSettings:", additionalSettings);
+  console.log("ProfileScreen render - onEditProfile:", onEditProfile);
+  console.log("ProfileScreen render - onLogout:", onLogout);
+  console.log("ProfileScreen render - title:", title);
+
+  // Safety check for profileData
+  if (!profileData) {
+    console.log("ProfileScreen: profileData is null/undefined, returning null");
+    return null;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
@@ -134,20 +149,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     weight="bold"
                     color={COLORS.text.primary}
                   >
-                    {profileData.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()}
+                    {profileData.name &&
+                    typeof profileData.name === "string" &&
+                    profileData.name.trim()
+                      ? profileData.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                      : "U"}
                   </ResponsiveText>
                 </View>
               )}
-              <TouchableOpacity
-                style={styles.editAvatarButton}
-                onPress={handleEditAvatar}
-              >
-                <Ionicons name="camera" size={16} color={COLORS.white} />
-              </TouchableOpacity>
             </View>
 
             <ResponsiveText
@@ -156,7 +169,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               color={COLORS.black}
               style={styles.userName}
             >
-              {profileData.name}
+              {profileData.name && typeof profileData.name === "string"
+                ? profileData.name
+                : "User"}
             </ResponsiveText>
 
             <ResponsiveText
@@ -164,25 +179,31 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               color={COLORS.text.secondary}
               style={styles.userEmail}
             >
-              {profileData.email}
+              {profileData.email && typeof profileData.email === "string"
+                ? profileData.email
+                : "user@example.com"}
             </ResponsiveText>
 
-            {/* Verification Badge for vendors/salesman */}
-            {profileData.verificationStatus && (
+            {/* Status Badge based on database status and email verification */}
+            {profileData.status && typeof profileData.status === "string" && (
               <View
                 style={[
                   styles.verificationBadge,
                   {
                     backgroundColor:
-                      profileData.verificationStatus === "verified"
+                      profileData.status === "ACTIVE" &&
+                      profileData.isEmailVerified
                         ? COLORS.success[100]
-                        : profileData.verificationStatus === "pending"
+                        : profileData.status === "PENDING" ||
+                          !profileData.isEmailVerified
                         ? COLORS.warning[100]
                         : COLORS.error[100],
                     borderColor:
-                      profileData.verificationStatus === "verified"
+                      profileData.status === "ACTIVE" &&
+                      profileData.isEmailVerified
                         ? COLORS.success[300]
-                        : profileData.verificationStatus === "pending"
+                        : profileData.status === "PENDING" ||
+                          !profileData.isEmailVerified
                         ? COLORS.warning[300]
                         : COLORS.error[300],
                   },
@@ -192,24 +213,100 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   variant="caption2"
                   weight="medium"
                   color={
-                    profileData.verificationStatus === "verified"
+                    profileData.status === "ACTIVE" &&
+                    profileData.isEmailVerified
                       ? COLORS.success[700]
-                      : profileData.verificationStatus === "pending"
+                      : profileData.status === "PENDING" ||
+                        !profileData.isEmailVerified
                       ? COLORS.warning[700]
                       : COLORS.error[700]
                   }
                   style={styles.verificationBadgeText}
                 >
-                  {profileData.verificationStatus === "verified"
-                    ? "✓ Verified"
-                    : profileData.verificationStatus === "pending"
+                  {profileData.status === "ACTIVE" &&
+                  profileData.isEmailVerified
+                    ? "✓ Active"
+                    : profileData.status === "PENDING" ||
+                      !profileData.isEmailVerified
                     ? "⏳ Pending"
-                    : "✗ Unverified"}
+                    : profileData.status === "INACTIVE"
+                    ? "✗ Inactive"
+                    : profileData.status === "SUSPENDED"
+                    ? "⚠ Suspended"
+                    : "❓ Unknown"}
                 </ResponsiveText>
               </View>
             )}
           </View>
         </LinearGradient>
+
+        {/* Role Switch Option */}
+        {roleSwitchOption &&
+          roleSwitchOption.title &&
+          roleSwitchOption.onPress && (
+            <View style={styles.settingsSection}>
+              <ResponsiveText
+                variant="h4"
+                weight="bold"
+                color={COLORS.primary[300]}
+                style={styles.sectionTitle}
+              >
+                Switch Role
+              </ResponsiveText>
+              <View style={styles.settingsContainer}>
+                <TouchableOpacity
+                  style={styles.settingCard}
+                  onPress={roleSwitchOption.onPress}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.settingLeft}>
+                    <View
+                      style={[
+                        styles.settingIcon,
+                        {
+                          backgroundColor:
+                            roleSwitchOption.iconBackground ||
+                            COLORS.primary[100],
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={roleSwitchOption.icon as any}
+                        size={24}
+                        color={
+                          roleSwitchOption.iconColor || COLORS.primary[600]
+                        }
+                      />
+                    </View>
+                    <View style={styles.settingTextContainer}>
+                      <ResponsiveText
+                        variant="body2"
+                        weight="semiBold"
+                        color={COLORS.text.primary}
+                      >
+                        {roleSwitchOption.title}
+                      </ResponsiveText>
+                      {roleSwitchOption.description && (
+                        <ResponsiveText
+                          variant="caption2"
+                          color={COLORS.text.secondary}
+                          style={styles.settingDescription}
+                        >
+                          {roleSwitchOption.description}
+                        </ResponsiveText>
+                      )}
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color={COLORS.text.secondary}
+                    />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
         {/* Manage Account Section */}
         <View style={styles.settingsSection}>
           <ResponsiveText
@@ -227,15 +324,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               style={styles.settingCard}
               onPress={() => {
                 // Navigate to role-specific edit profile screen
-                if (profileData.role === "vendor") {
-                  router.push("/(dashboard)/(vendor)/edit-profile");
-                } else if (profileData.role === "user") {
-                  router.push("/(dashboard)/(user)/edit-profile");
-                } else if (profileData.role === "salesman") {
-                  router.push("/(dashboard)/(salesman)/edit-profile");
-                } else {
-                  // For other roles, default to user edit profile
-                  router.push("/(dashboard)/(user)/edit-profile");
+                if (profileData.role && typeof profileData.role === "string") {
+                  if (profileData.role === "vendor") {
+                    router.push("/(dashboard)/(vendor)/edit-profile");
+                  } else if (profileData.role === "user") {
+                    router.push("/(dashboard)/(user)/edit-profile");
+                  } else if (profileData.role === "salesman") {
+                    router.push("/(dashboard)/(salesman)/edit-profile");
+                  } else {
+                    // For other roles, default to user edit profile
+                    router.push("/(dashboard)/(user)/edit-profile");
+                  }
                 }
               }}
             >
@@ -276,47 +375,49 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               />
             </TouchableOpacity>
 
-            {/* My Saved Lists */}
-            <TouchableOpacity
-              style={styles.settingCard}
-              onPress={() => console.log("My saved lists pressed")}
-            >
-              <View style={styles.settingLeft}>
-                <View
-                  style={[
-                    styles.settingIcon,
-                    { backgroundColor: COLORS.purple[100] },
-                  ]}
-                >
-                  <Ionicons
-                    name="bookmark"
-                    size={20}
-                    color={COLORS.purple[600]}
-                  />
-                </View>
-                <View style={styles.settingTextContainer}>
-                  <ResponsiveText
-                    variant="body2"
-                    weight="bold"
-                    color={COLORS.text.primary}
+            {/* My Saved Lists - Hide for vendors */}
+            {profileData.role !== "vendor" && (
+              <TouchableOpacity
+                style={styles.settingCard}
+                onPress={() => console.log("My saved lists pressed")}
+              >
+                <View style={styles.settingLeft}>
+                  <View
+                    style={[
+                      styles.settingIcon,
+                      { backgroundColor: COLORS.purple[100] },
+                    ]}
                   >
-                    My Saved Lists
-                  </ResponsiveText>
-                  <ResponsiveText
-                    variant="caption2"
-                    color={COLORS.text.secondary}
-                    style={styles.settingDescription}
-                  >
-                    Organize your favorite places
-                  </ResponsiveText>
+                    <Ionicons
+                      name="bookmark"
+                      size={20}
+                      color={COLORS.purple[600]}
+                    />
+                  </View>
+                  <View style={styles.settingTextContainer}>
+                    <ResponsiveText
+                      variant="body2"
+                      weight="bold"
+                      color={COLORS.text.primary}
+                    >
+                      My Saved Lists
+                    </ResponsiveText>
+                    <ResponsiveText
+                      variant="caption2"
+                      color={COLORS.text.secondary}
+                      style={styles.settingDescription}
+                    >
+                      Organize your favorite places
+                    </ResponsiveText>
+                  </View>
                 </View>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={COLORS.text.secondary}
-              />
-            </TouchableOpacity>
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={COLORS.text.secondary}
+                />
+              </TouchableOpacity>
+            )}
 
             {/* Notifications */}
             <TouchableOpacity
@@ -487,13 +588,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         {/* Logout Button */}
         <View style={styles.logoutSection}>
           <ResponsiveButton
-            title="Logout"
+            title={isLoggingOut ? "Logging out..." : "Logout"}
             variant="outline"
             size="large"
             fullWidth
             onPress={onLogout}
+            loading={isLoggingOut}
+            disabled={isLoggingOut}
             leftIcon={
-              <Ionicons name="log-out" size={20} color={COLORS.error[500]} />
+              !isLoggingOut && (
+                <Ionicons name="log-out" size={20} color={COLORS.error[500]} />
+              )
             }
             style={styles.logoutButton}
             textStyle={styles.logoutButtonText}
@@ -563,19 +668,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 4,
-    borderColor: COLORS.white,
-  },
-  editAvatarButton: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.black,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 3,
     borderColor: COLORS.white,
   },
   userName: {
