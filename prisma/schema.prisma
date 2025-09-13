@@ -1,0 +1,503 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGO_URI")
+}
+
+// User Roles Enum
+enum UserRole {
+  USER
+  VENDOR
+  SALESMAN
+  ADMIN
+}
+
+// Auth Provider Enum
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+// User Status Enum
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING
+  VERIFIED
+}
+
+// Service Categories Enum
+enum ServiceCategory {
+  HEALTH_CARE
+  FITNESS
+  TRAVEL
+  LOANS
+  DOCTORS
+  BEAUTY
+  GYMS
+  REPAIRS_SERVICES
+  RETAIL
+  PROFESSIONAL_SERVICES
+  RESTAURANTS
+  HOTEL_SERVICE
+  TECH_SERVICE
+  CAFE_SNACKS
+  WEAR_ACC
+  CAR_SERVICE
+  SPA_CENTER
+}
+
+// Booking Status Enum
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+// Payment Status Enum
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// Support Ticket Status Enum
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// Support Ticket Priority Enum
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// Content Moderation Status Enum
+enum ContentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FLAGGED
+}
+
+// Image Type Enum
+enum ImageType {
+  PROFILE_PICTURE
+  SERVICE_PICTURE
+  COVER_PICTURE
+  PROMOTION_PICTURE
+  BUSINESS_LOGO
+  BUSINESS_COVER
+  GALLERY_IMAGE
+  DOCUMENT_IMAGE
+  BANNER_IMAGE
+  ICON_IMAGE
+}
+
+// Main User Model
+model User {
+  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+  email           String       @unique
+  password        String?
+  name            String
+  phone           String?
+  role            UserRole     @default(USER)
+  status          UserStatus   @default(PENDING)
+  provider        AuthProvider @default(LOCAL)
+  providerId      String?
+  isEmailVerified Boolean      @default(false)
+  isPhoneVerified Boolean      @default(false)
+  otpCode         String?
+  otpExpiresAt    DateTime?
+  otpAttempts     Int          @default(0)
+  lastLoginAt     DateTime?
+
+  // Primary/Personal Address
+  primaryAddress String?
+  primaryCity    String?
+  primaryState   String?
+  primaryZipCode String?
+  primaryCountry String? @default("India")
+  bio            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  vendor          Vendor?
+  salesman        Salesman?
+  admin           Admin?
+  bookings        Booking[]
+  reviews         Review[]
+  savedLists      SavedList[]
+  supportTickets  SupportTicket[]
+  flaggedContent  FlaggedContent[]
+  reviewedContent FlaggedContent[] @relation("ContentReviewer")
+  adminActions    AdminAction[]
+  auditLogs       AuditLog[]
+  uploadedImages  Image[]
+
+  @@map("users")
+}
+
+// Business Address Model
+model BusinessAddress {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId    String   @db.ObjectId
+  name        String // "Main Office", "Branch Office", etc.
+  address     String
+  city        String
+  state       String
+  zipCode     String?
+  country     String   @default("India")
+  description String?
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("business_addresses")
+}
+
+// Vendor Model
+model Vendor {
+  id                     String            @id @default(auto()) @map("_id") @db.ObjectId
+  userId                 String            @unique @db.ObjectId
+  businessName           String
+  businessEmail          String
+  businessPhone          String
+  businessDescription    String?
+  businessLicense        String?
+  businessInsurance      String?
+  businessCertifications String[]
+  businessHours          Json? // Store as JSON for flexible hours
+  categories             ServiceCategory[]
+  verificationStatus     UserStatus        @default(PENDING)
+  isVerified             Boolean           @default(false)
+  rating                 Float             @default(0)
+  totalReviews           Int               @default(0)
+  totalBookings          Int               @default(0)
+  totalRevenue           Float             @default(0)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  // Relations
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  services          Service[]
+  bookings          Booking[]
+  reviews           Review[]
+  promotions        Promotion[]
+  businessAddresses BusinessAddress[]
+
+  @@map("vendors")
+}
+
+// Salesman Model
+model Salesman {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String   @unique @db.ObjectId
+  territory        String
+  targetVendors    Int      @default(25)
+  targetUsers      Int      @default(100)
+  vendorsOnboarded Int      @default(0)
+  usersOnboarded   Int      @default(0)
+  totalCommission  Float    @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@map("salesmen")
+}
+
+// Admin Model
+model Admin {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @unique @db.ObjectId
+  permissions  String[] // Array of permission strings
+  department   String?
+  isSuperAdmin Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adminActions AdminAction[]
+
+  @@map("admins")
+}
+
+// Service Model
+model Service {
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId      String          @db.ObjectId
+  name          String
+  description   String
+  category      ServiceCategory
+  subcategory   String?
+  price         Float
+  currency      String          @default("INR")
+  duration      Int? // Duration in minutes
+  isActive      Boolean         @default(true)
+  isFeatured    Boolean         @default(false)
+  rating        Float           @default(0)
+  totalReviews  Int             @default(0)
+  totalBookings Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Relations
+  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+  reviews  Review[]
+
+  @@map("services")
+}
+
+// Booking Model
+model Booking {
+  id                 String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String        @db.ObjectId
+  serviceId          String        @db.ObjectId
+  vendorId           String        @db.ObjectId
+  salesmanId         String?       @db.ObjectId
+  bookingDate        DateTime
+  bookingTime        String // Time slot
+  status             BookingStatus @default(PENDING)
+  paymentStatus      PaymentStatus @default(PENDING)
+  amount             Float
+  currency           String        @default("INR")
+  notes              String?
+  cancellationReason String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  // Relations
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  salesman Salesman? @relation(fields: [salesmanId], references: [id], onDelete: SetNull)
+
+  @@map("bookings")
+}
+
+// Review Model
+model Review {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  serviceId  String   @db.ObjectId
+  vendorId   String   @db.ObjectId
+  rating     Int // 1-5 stars
+  comment    String?
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  vendor  Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+// Saved List Model
+model SavedList {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  name        String
+  description String?
+  services    String[] // Array of service IDs
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("saved_lists")
+}
+
+// Promotion Model
+model Promotion {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId      String   @db.ObjectId
+  title         String
+  description   String
+  discountType  String // PERCENTAGE, FIXED_AMOUNT
+  discountValue Float
+  startDate     DateTime
+  endDate       DateTime
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("promotions")
+}
+
+// Support Ticket Model
+model SupportTicket {
+  id          String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String         @db.ObjectId
+  subject     String
+  description String
+  priority    TicketPriority @default(MEDIUM)
+  status      TicketStatus   @default(OPEN)
+  assignedTo  String?        @db.ObjectId
+  resolution  String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("support_tickets")
+}
+
+// Flagged Content Model
+model FlaggedContent {
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
+  contentType String // REVIEW, LISTING, COMMENT
+  contentId   String
+  flaggedBy   String        @db.ObjectId
+  reason      String
+  status      ContentStatus @default(PENDING)
+  reviewedBy  String?       @db.ObjectId
+  reviewNotes String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  user     User  @relation(fields: [flaggedBy], references: [id], onDelete: Cascade)
+  reviewer User? @relation("ContentReviewer", fields: [reviewedBy], references: [id])
+
+  @@map("flagged_content")
+}
+
+// Admin Action Model
+model AdminAction {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  adminId    String   @db.ObjectId
+  userId     String   @db.ObjectId
+  action     String
+  targetType String // USER, VENDOR, SERVICE, etc.
+  targetId   String
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("admin_actions")
+}
+
+// Audit Log Model
+model AuditLog {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String?  @db.ObjectId
+  action     String
+  resource   String
+  resourceId String?
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+// System Settings Model
+model SystemSetting {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  key         String   @unique
+  value       String
+  description String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+// Notification Template Model
+model NotificationTemplate {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  type      String // EMAIL, SMS, PUSH
+  name      String
+  subject   String?
+  body      String
+  variables String[] // Array of variable names
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notification_templates")
+}
+
+// Blacklist Token Model
+model BlacklistToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime // Will be set to 24 hours from createdAt
+
+  @@index([expiresAt])
+  @@map("blacklist_tokens")
+}
+
+// Image Model - Centralized image management
+model Image {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  url        String // The actual image URL
+  filename   String // Original filename
+  mimeType   String // image/jpeg, image/png, etc.
+  size       Int // File size in bytes
+  width      Int? // Image width in pixels
+  height     Int? // Image height in pixels
+  type       ImageType // What kind of image this is
+  entityType String // Which table/entity this belongs to (User, Service, Vendor, etc.)
+  entityId   String // ID of the related entity
+  altText    String? // Accessibility alt text
+  isActive   Boolean   @default(true)
+  uploadedBy String    @db.ObjectId // Who uploaded this image
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relations
+  uploader User @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@index([entityType, entityId])
+  @@index([type])
+  @@index([uploadedBy])
+  @@index([isActive])
+  @@map("images")
+}
