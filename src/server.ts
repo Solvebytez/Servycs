@@ -40,6 +40,9 @@ export class Server {
     this.app.post("/api/login", tokenLogin);
     this.app.post("/api/register", tokenRegister);
 
+    // Category routes (at root level /api/categories for consistency)
+    this.app.use("/api/categories", require("@/routes/category").default);
+
     // API routes
     this.app.use("/api/v1", setupRoutes());
 

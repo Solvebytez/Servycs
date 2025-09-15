@@ -33,25 +33,31 @@ enum UserStatus {
   VERIFIED
 }
 
-// Service Categories Enum
-enum ServiceCategory {
-  HEALTH_CARE
-  FITNESS
-  TRAVEL
-  LOANS
-  DOCTORS
-  BEAUTY
-  GYMS
-  REPAIRS_SERVICES
-  RETAIL
-  PROFESSIONAL_SERVICES
-  RESTAURANTS
-  HOTEL_SERVICE
-  TECH_SERVICE
-  CAFE_SNACKS
-  WEAR_ACC
-  CAR_SERVICE
-  SPA_CENTER
+// Category Model for nested categories
+model Category {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  slug        String // URL-friendly version of name
+  description String?
+  isActive    Boolean @default(true)
+
+  // Self-referential relation for parent/child hierarchy
+  parentId String?    @db.ObjectId
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children Category[] @relation("CategoryHierarchy")
+
+  // Metadata
+  sortOrder Int      @default(0) // For custom ordering
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  services Service[] // Services using this category
+
+  @@unique([slug])
+  @@index([parentId])
+  @@index([isActive])
+  @@map("categories")
 }
 
 // Booking Status Enum
@@ -178,8 +184,8 @@ model BusinessAddress {
 
 // Vendor Model
 model Vendor {
-  id                     String            @id @default(auto()) @map("_id") @db.ObjectId
-  userId                 String            @unique @db.ObjectId
+  id                     String     @id @default(auto()) @map("_id") @db.ObjectId
+  userId                 String     @unique @db.ObjectId
   businessName           String
   businessEmail          String
   businessPhone          String
@@ -188,15 +194,15 @@ model Vendor {
   businessInsurance      String?
   businessCertifications String[]
   businessHours          Json? // Store as JSON for flexible hours
-  categories             ServiceCategory[]
-  verificationStatus     UserStatus        @default(PENDING)
-  isVerified             Boolean           @default(false)
-  rating                 Float             @default(0)
-  totalReviews           Int               @default(0)
-  totalBookings          Int               @default(0)
-  totalRevenue           Float             @default(0)
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
+  // Categories removed - now handled through services
+  verificationStatus     UserStatus @default(PENDING)
+  isVerified             Boolean    @default(false)
+  rating                 Float      @default(0)
+  totalReviews           Int        @default(0)
+  totalBookings          Int        @default(0)
+  totalRevenue           Float      @default(0)
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
   // Relations
   user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -248,28 +254,32 @@ model Admin {
 
 // Service Model
 model Service {
-  id            String          @id @default(auto()) @map("_id") @db.ObjectId
-  vendorId      String          @db.ObjectId
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId      String   @db.ObjectId
   name          String
   description   String
-  category      ServiceCategory
-  subcategory   String?
+  categoryId    String   @db.ObjectId
   price         Float
-  currency      String          @default("INR")
+  currency      String   @default("INR")
   duration      Int? // Duration in minutes
-  isActive      Boolean         @default(true)
-  isFeatured    Boolean         @default(false)
-  rating        Float           @default(0)
-  totalReviews  Int             @default(0)
-  totalBookings Int             @default(0)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  isActive      Boolean  @default(true)
+  isFeatured    Boolean  @default(false)
+  rating        Float    @default(0)
+  totalReviews  Int      @default(0)
+  totalBookings Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
-  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  category Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   bookings Booking[]
   reviews  Review[]
 
+  @@index([categoryId])
+  @@index([vendorId])
+  @@index([isActive])
+  @@index([isFeatured])
   @@map("services")
 }
 
@@ -292,10 +302,10 @@ model Booking {
   updatedAt          DateTime      @updatedAt
 
   // Relations
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  salesman Salesman? @relation(fields: [salesmanId], references: [id], onDelete: SetNull)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  salesman Salesman? @relation(fields: [salesmanId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@map("bookings")
 }
@@ -313,9 +323,9 @@ model Review {
   updatedAt  DateTime @updatedAt
 
   // Relations
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  vendor  Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vendor  Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("reviews")
 }

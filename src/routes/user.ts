@@ -299,7 +299,10 @@ router.put(
         });
 
         // Add new business addresses (don't delete existing ones)
-        if (updateData.businessAddresses.length > 0) {
+        if (
+          updateData.businessAddresses &&
+          Array.isArray(updateData.businessAddresses)
+        ) {
           await (prisma as any).businessAddress.createMany({
             data: updateData.businessAddresses.map((addr: any) => ({
               vendorId: vendorRecord.id, // Use vendor's ID, not user's ID
@@ -530,6 +533,229 @@ router.post(
       return res.status(500).json({
         success: false,
         message: "Failed to switch role",
+      });
+    }
+  }
+);
+
+// GET /users/business-addresses - Get all business addresses for current vendor
+router.get(
+  "/business-addresses",
+  authenticate,
+  async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user.id;
+      const userRole = (req as any).user.role;
+
+      console.log("=== GET BUSINESS ADDRESSES DEBUG ===");
+      console.log("User ID:", userId);
+      console.log("User Role:", userRole);
+      console.log("=== END DEBUG ===");
+
+      // Only vendors can have business addresses
+      if (userRole !== "VENDOR") {
+        return res.status(403).json({
+          success: false,
+          message: "Only vendors can have business addresses",
+        });
+      }
+
+      // Get the vendor record for this user
+      const vendor = await prisma.vendor.findUnique({
+        where: { userId: userId },
+        include: {
+          businessAddresses: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              city: true,
+              state: true,
+              zipCode: true,
+              country: true,
+              description: true,
+              isPrimary: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: [
+              { isPrimary: "desc" }, // Primary addresses first
+              { createdAt: "asc" }, // Then by creation date
+            ],
+          },
+        },
+      });
+
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: "Vendor record not found",
+        });
+      }
+
+      const businessAddresses = vendor.businessAddresses || [];
+
+      return res.json({
+        success: true,
+        data: businessAddresses,
+        message: "Business addresses retrieved successfully",
+      });
+    } catch (error) {
+      console.error("Error fetching business addresses:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch business addresses",
+        error: process.env.NODE_ENV === "development" ? error : undefined,
+      });
+    }
+  }
+);
+
+// POST /users/business-addresses - Create new business address
+router.post(
+  "/business-addresses",
+  authenticate,
+  validateRequest,
+  [
+    body("name")
+      .notEmpty()
+      .trim()
+      .isLength({ min: 2, max: 50 })
+      .withMessage(
+        "Address type is required and must be between 2 and 50 characters"
+      ),
+    body("address")
+      .notEmpty()
+      .trim()
+      .isLength({ min: 1, max: 500 })
+      .withMessage(
+        "Address is required and must be between 1 and 500 characters"
+      ),
+    body("city")
+      .notEmpty()
+      .trim()
+      .isLength({ min: 1, max: 100 })
+      .withMessage("City is required and must be between 1 and 100 characters"),
+    body("state")
+      .notEmpty()
+      .trim()
+      .isLength({ min: 1, max: 100 })
+      .withMessage(
+        "State is required and must be between 1 and 100 characters"
+      ),
+    body("zipCode")
+      .optional()
+      .trim()
+      .custom((value) => {
+        if (!value) return true; // Optional field
+        // Indian zip codes are 6 digits, starting with 1-9
+        const zipCodeRegex = /^[1-9][0-9]{5}$/;
+        if (!zipCodeRegex.test(value)) {
+          throw new Error("Please enter a valid Indian zip code (6 digits)");
+        }
+        return true;
+      }),
+    body("country")
+      .optional()
+      .trim()
+      .isLength({ min: 1, max: 100 })
+      .withMessage("Country must be between 1 and 100 characters"),
+    body("description")
+      .optional()
+      .trim()
+      .isLength({ max: 1000 })
+      .withMessage("Description must not exceed 1000 characters"),
+    body("isPrimary")
+      .optional()
+      .isBoolean()
+      .withMessage("isPrimary must be a boolean value"),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user.id;
+      const userRole = (req as any).user.role;
+      const addressData = req.body;
+
+      console.log("=== CREATE BUSINESS ADDRESS DEBUG ===");
+      console.log("User ID:", userId);
+      console.log("User Role:", userRole);
+      console.log("Address Data:", addressData);
+      console.log("=== END DEBUG ===");
+
+      // Only vendors can create business addresses
+      if (userRole !== "VENDOR") {
+        return res.status(403).json({
+          success: false,
+          message: "Only vendors can create business addresses",
+        });
+      }
+
+      // Get the vendor record for this user
+      const vendor = await prisma.vendor.findUnique({
+        where: { userId: userId },
+      });
+
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: "Vendor record not found",
+        });
+      }
+
+      // If this is being set as primary, unset other primary addresses
+      if (addressData.isPrimary) {
+        await prisma.businessAddress.updateMany({
+          where: {
+            vendorId: vendor.id,
+            isPrimary: true,
+          },
+          data: {
+            isPrimary: false,
+          },
+        });
+      }
+
+      // Create the new business address
+      const newAddress = await prisma.businessAddress.create({
+        data: {
+          vendorId: vendor.id,
+          name: addressData.name,
+          address: addressData.address,
+          city: addressData.city,
+          state: addressData.state,
+          zipCode: addressData.zipCode || null,
+          country: addressData.country || "India",
+          description: addressData.description || null,
+          isPrimary: addressData.isPrimary || false,
+        },
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          city: true,
+          state: true,
+          zipCode: true,
+          country: true,
+          description: true,
+          isPrimary: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      console.log("Created address:", newAddress);
+
+      return res.status(201).json({
+        success: true,
+        message: "Business address created successfully",
+        data: newAddress,
+      });
+    } catch (error) {
+      console.error("Error creating business address:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to create business address",
+        error: process.env.NODE_ENV === "development" ? error : undefined,
       });
     }
   }
