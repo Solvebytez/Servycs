@@ -37,7 +37,7 @@ export const authenticate = async (
 
     const decoded = verifyAccessToken(token);
 
-    // Check if user still exists
+    // Check if user still exists and validate session
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       select: {
@@ -45,6 +45,7 @@ export const authenticate = async (
         email: true,
         role: true,
         status: true,
+        currentSessionId: true,
       },
     });
 
@@ -54,6 +55,11 @@ export const authenticate = async (
 
     if (user.status !== "ACTIVE") {
       throw new CustomError("Account is not active", 401);
+    }
+
+    // Validate session ID for single device login
+    if (decoded.sessionId && user.currentSessionId !== decoded.sessionId) {
+      throw new CustomError("Session expired - logged in elsewhere", 401);
     }
 
     req.user = {
@@ -133,10 +139,17 @@ export const optionalAuth = async (
         email: true,
         role: true,
         status: true,
+        currentSessionId: true,
       },
     });
 
     if (user && user.status === "ACTIVE") {
+      // Validate session ID for single device login
+      if (decoded.sessionId && user.currentSessionId !== decoded.sessionId) {
+        // Session invalid, don't authenticate
+        return next();
+      }
+
       req.user = {
         id: user.id,
         email: user.email,

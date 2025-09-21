@@ -52,7 +52,8 @@ model Category {
   updatedAt DateTime @updatedAt
 
   // Relations
-  services Service[] // Services using this category
+  services        Service[] // Individual services using this category
+  serviceListings ServiceListing[] // Service listings using this category
 
   @@unique([slug])
   @@index([parentId])
@@ -101,6 +102,23 @@ enum ContentStatus {
   FLAGGED
 }
 
+// Service Listing Status Enum
+enum ServiceListingStatus {
+  ACTIVE
+  PENDING
+  REJECTED
+  OFF_SERVICE
+}
+
+// Promotion Status Enum
+enum PromotionStatus {
+  ACTIVE
+  PENDING
+  INACTIVE
+  EXPIRED
+  REJECTED
+}
+
 // Image Type Enum
 enum ImageType {
   PROFILE_PICTURE
@@ -117,21 +135,22 @@ enum ImageType {
 
 // Main User Model
 model User {
-  id              String       @id @default(auto()) @map("_id") @db.ObjectId
-  email           String       @unique
-  password        String?
-  name            String
-  phone           String?
-  role            UserRole     @default(USER)
-  status          UserStatus   @default(PENDING)
-  provider        AuthProvider @default(LOCAL)
-  providerId      String?
-  isEmailVerified Boolean      @default(false)
-  isPhoneVerified Boolean      @default(false)
-  otpCode         String?
-  otpExpiresAt    DateTime?
-  otpAttempts     Int          @default(0)
-  lastLoginAt     DateTime?
+  id               String       @id @default(auto()) @map("_id") @db.ObjectId
+  email            String       @unique
+  password         String?
+  name             String
+  phone            String?
+  role             UserRole     @default(USER)
+  status           UserStatus   @default(PENDING)
+  provider         AuthProvider @default(LOCAL)
+  providerId       String?
+  isEmailVerified  Boolean      @default(false)
+  isPhoneVerified  Boolean      @default(false)
+  otpCode          String?
+  otpExpiresAt     DateTime?
+  otpAttempts      Int          @default(0)
+  lastLoginAt      DateTime?
+  currentSessionId String? // Track current active session for single device login
 
   // Primary/Personal Address
   primaryAddress String?
@@ -150,6 +169,7 @@ model User {
   admin           Admin?
   bookings        Booking[]
   reviews         Review[]
+  appReviews      AppReview[]
   savedLists      SavedList[]
   supportTickets  SupportTicket[]
   flaggedContent  FlaggedContent[]
@@ -157,6 +177,7 @@ model User {
   adminActions    AdminAction[]
   auditLogs       AuditLog[]
   uploadedImages  Image[]
+  favorites       UserFavorite[]
 
   @@map("users")
 }
@@ -177,7 +198,8 @@ model BusinessAddress {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor          Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  serviceListings ServiceListing[]
 
   @@map("business_addresses")
 }
@@ -206,11 +228,12 @@ model Vendor {
 
   // Relations
   user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  services          Service[]
+  businessAddresses BusinessAddress[]
+  serviceListings   ServiceListing[]
   bookings          Booking[]
   reviews           Review[]
   promotions        Promotion[]
-  businessAddresses BusinessAddress[]
+  Service           Service[]
 
   @@map("vendors")
 }
@@ -252,34 +275,77 @@ model Admin {
   @@map("admins")
 }
 
-// Service Model
-model Service {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  vendorId      String   @db.ObjectId
-  name          String
-  description   String
-  categoryId    String   @db.ObjectId
-  price         Float
-  currency      String   @default("INR")
-  duration      Int? // Duration in minutes
-  isActive      Boolean  @default(true)
-  isFeatured    Boolean  @default(false)
-  rating        Float    @default(0)
-  totalReviews  Int      @default(0)
-  totalBookings Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+// Service Listing Model - Main listing created by vendor
+model ServiceListing {
+  id             String               @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId       String               @db.ObjectId
+  title          String // Shop/Service name
+  description    String // Main description
+  categoryId     String               @db.ObjectId
+  categoryPath   String[] // Full category path for easy filtering
+  contactNumber  String
+  whatsappNumber String
+  image          String? // Main service image URL
+  addressId      String               @db.ObjectId // Business address ID
+  status         ServiceListingStatus @default(PENDING)
+  isServiceOn    Boolean              @default(true) // Vendor can turn service on/off
+  isFeatured     Boolean              @default(false)
+  rating         Float                @default(0)
+  totalReviews   Int                  @default(0)
+  totalBookings  Int                  @default(0)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
   // Relations
-  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  category Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  bookings Booking[]
-  reviews  Review[]
+  vendor            Vendor                    @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  category          Category                  @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  address           BusinessAddress           @relation(fields: [addressId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  services          Service[] // Individual services within this listing
+  bookings          Booking[]
+  reviews           Review[]
+  promotionListings PromotionServiceListing[]
+  favoritedBy       UserFavorite[]
 
   @@index([categoryId])
   @@index([vendorId])
-  @@index([isActive])
+  @@index([addressId])
+  @@index([status])
+  @@index([isServiceOn])
   @@index([isFeatured])
+  @@map("service_listings")
+}
+
+// Individual Service Model - Services within a listing
+model Service {
+  id            String               @id @default(auto()) @map("_id") @db.ObjectId
+  listingId     String               @db.ObjectId // Reference to ServiceListing
+  name          String
+  description   String
+  price         Float
+  discountPrice Float? // Optional discount price
+  currency      String               @default("INR")
+  duration      Int? // Duration in minutes
+  businessHours Json? // Business hours for each day of the week
+  status        ServiceListingStatus @default(PENDING)
+  isServiceOn   Boolean              @default(true) // Vendor can turn individual service on/off
+  rating        Float                @default(0)
+  totalReviews  Int                  @default(0)
+  totalBookings Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  // Relations
+  listing    ServiceListing @relation(fields: [listingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  bookings   Booking[]
+  reviews    Review[]
+  Category   Category?      @relation(fields: [categoryId], references: [id])
+  categoryId String?        @db.ObjectId
+  Vendor     Vendor?        @relation(fields: [vendorId], references: [id])
+  vendorId   String?        @db.ObjectId
+
+  @@index([listingId])
+  @@index([status])
+  @@index([isServiceOn])
   @@map("services")
 }
 
@@ -287,7 +353,8 @@ model Service {
 model Booking {
   id                 String        @id @default(auto()) @map("_id") @db.ObjectId
   userId             String        @db.ObjectId
-  serviceId          String        @db.ObjectId
+  listingId          String        @db.ObjectId // Reference to ServiceListing
+  serviceId          String?       @db.ObjectId // Optional reference to specific Service
   vendorId           String        @db.ObjectId
   salesmanId         String?       @db.ObjectId
   bookingDate        DateTime
@@ -302,19 +369,21 @@ model Booking {
   updatedAt          DateTime      @updatedAt
 
   // Relations
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  salesman Salesman? @relation(fields: [salesmanId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  listing  ServiceListing @relation(fields: [listingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service  Service?       @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vendor   Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  salesman Salesman?      @relation(fields: [salesmanId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@map("bookings")
 }
 
-// Review Model
+// Service Review Model - For individual service reviews
 model Review {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   userId     String   @db.ObjectId
-  serviceId  String   @db.ObjectId
+  listingId  String   @db.ObjectId // Reference to ServiceListing
+  serviceId  String?  @db.ObjectId // Optional reference to specific Service
   vendorId   String   @db.ObjectId
   rating     Int // 1-5 stars
   comment    String?
@@ -323,11 +392,49 @@ model Review {
   updatedAt  DateTime @updatedAt
 
   // Relations
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  vendor  Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  listing ServiceListing @relation(fields: [listingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service Service?       @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vendor  Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("reviews")
+}
+
+// App Review Status Enum
+enum AppReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  HIDDEN
+}
+
+// App Review Model - For overall app feedback and ratings
+model AppReview {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String          @db.ObjectId
+  rating      Int // 1-5 stars for overall app experience
+  title       String? // Optional review title
+  comment     String? // Detailed feedback about the app
+  categories  String[] // Array of categories being reviewed (e.g., ["UI/UX", "Performance", "Features"])
+  ratings     Json? // Detailed ratings for different aspects (e.g., {"UI": 5, "Performance": 4, "Features": 3})
+  isAnonymous Boolean         @default(false) // Allow anonymous reviews
+  status      AppReviewStatus @default(PENDING) // Moderation status
+  isPublic    Boolean         @default(true) // Whether to show in public reviews
+  helpful     Int             @default(0) // Number of users who found this helpful
+  notHelpful  Int             @default(0) // Number of users who found this not helpful
+  deviceInfo  Json? // Device and app version info
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId])
+  @@index([rating])
+  @@index([status])
+  @@index([isPublic])
+  @@index([createdAt])
+  @@map("app_reviews")
 }
 
 // Saved List Model
@@ -347,24 +454,61 @@ model SavedList {
   @@map("saved_lists")
 }
 
+// User Favorite Model - Individual service listings favorited by users
+model UserFavorite {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String   @db.ObjectId
+  serviceListingId String   @db.ObjectId
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceListing ServiceListing @relation(fields: [serviceListingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, serviceListingId])
+  @@index([userId])
+  @@index([serviceListingId])
+  @@map("user_favorites")
+}
+
 // Promotion Model
 model Promotion {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  vendorId      String   @db.ObjectId
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId      String          @db.ObjectId
   title         String
   description   String
   discountType  String // PERCENTAGE, FIXED_AMOUNT
   discountValue Float
+  originalPrice Float? // For fixed amount discounts
   startDate     DateTime
   endDate       DateTime
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  bannerImage   String? // URL to banner image
+  status        PromotionStatus @default(PENDING)
+  isPromotionOn Boolean         @default(false) // Quick on/off toggle
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   // Relations
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor          Vendor                    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  serviceListings PromotionServiceListing[]
 
   @@map("promotions")
+}
+
+// Promotion Service Listing Junction Model
+model PromotionServiceListing {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  promotionId      String   @db.ObjectId
+  serviceListingId String   @db.ObjectId
+  createdAt        DateTime @default(now())
+
+  // Relations
+  promotion      Promotion      @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  serviceListing ServiceListing @relation(fields: [serviceListingId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, serviceListingId])
+  @@map("promotion_service_listings")
 }
 
 // Support Ticket Model

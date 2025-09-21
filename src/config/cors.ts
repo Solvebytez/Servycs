@@ -2,7 +2,7 @@ import { CorsOptions } from 'cors';
 import { env } from './env';
 
 export const corsConfig: CorsOptions = {
-  origin: env.CORS_ORIGIN,
+  origin: true, // Allow all origins in development
   credentials: env.CORS_CREDENTIALS,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: [

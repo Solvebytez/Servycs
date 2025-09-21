@@ -12,8 +12,9 @@ import {
   setRefreshTokenCookie,
   clearRefreshTokenCookie,
   extractTokenFromHeader,
+  generateSessionId,
 } from "@/utils/jwt";
-import { blacklistToken } from "@/utils/blacklistToken";
+import { blacklistToken, blacklistAllUserTokens } from "@/utils/blacklistToken";
 import { sendEmail, emailTemplates } from "@/utils/email";
 import {
   verifySignInToken,
@@ -152,17 +153,27 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     );
   }
 
-  // Update last login
+  // Generate new session ID for single device login
+  const newSessionId = generateSessionId();
+
+  // Update user with new session ID and last login
   await prisma.user.update({
     where: { id: user.id },
-    data: { lastLoginAt: new Date() },
+    data: {
+      lastLoginAt: new Date(),
+      currentSessionId: newSessionId,
+    },
   });
 
-  // Generate tokens
+  // Blacklist all existing tokens for this user (single device login)
+  await blacklistAllUserTokens(user.id);
+
+  // Generate tokens with session ID
   const accessToken = generateAccessToken({
     userId: user.id,
     email: user.email,
     role: user.role,
+    sessionId: newSessionId,
   });
 
   const refreshToken = generateRefreshToken({
@@ -250,6 +261,7 @@ export const refreshToken = async (
         email: true,
         role: true,
         status: true,
+        currentSessionId: true,
       },
     });
 
@@ -257,11 +269,12 @@ export const refreshToken = async (
       throw new CustomError("Invalid refresh token", 401);
     }
 
-    // Generate new access token
+    // Generate new access token with current session ID
     const accessToken = generateAccessToken({
       userId: user.id,
       email: user.email,
       role: user.role,
+      sessionId: user.currentSessionId || undefined,
     });
 
     // Generate new refresh token
@@ -537,12 +550,16 @@ export const tokenLogin = async (
       );
     }
 
+    // Generate new session ID for single device login
+    const newSessionId = generateSessionId();
+
     // Update existing user - don't override status/verification for LOCAL provider
     const updateData: any = {
       name: name,
       provider: provider,
       providerId: providerId,
       lastLoginAt: new Date(),
+      currentSessionId: newSessionId,
     };
 
     // Only update status/verification for GOOGLE provider
@@ -561,6 +578,9 @@ export const tokenLogin = async (
         admin: true,
       },
     });
+
+    // Blacklist all existing tokens for this user (single device login)
+    await blacklistAllUserTokens(user.id);
   } else {
     // Only create new user for GOOGLE provider (OAuth)
     // LOCAL provider should never reach here due to validation above
@@ -636,11 +656,12 @@ export const tokenLogin = async (
     }
   }
 
-  // Generate tokens
+  // Generate tokens with session ID
   const accessToken = generateAccessToken({
     userId: user.id,
     email: user.email,
     role: user.role,
+    sessionId: user.currentSessionId || undefined,
   });
 
   const refreshToken = generateRefreshToken({

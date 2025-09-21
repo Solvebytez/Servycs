@@ -6,6 +6,10 @@ import serviceRoutes from "./service";
 import bookingRoutes from "./booking";
 import adminRoutes from "./admin";
 import uploadRoutes from "./upload";
+import promotionRoutes from "./promotion";
+import categoryRoutes from "./category";
+import adminCategoriesRoutes from "./adminCategories";
+import appReviewRoutes from "./appReview";
 
 const router = Router();
 
@@ -26,6 +30,10 @@ router.use("/vendors", vendorRoutes);
 router.use("/services", serviceRoutes);
 router.use("/bookings", bookingRoutes);
 router.use("/admin", adminRoutes);
+router.use("/admin/categories", adminCategoriesRoutes);
+router.use("/categories", categoryRoutes);
 router.use("/upload", uploadRoutes);
+router.use("/promotions", promotionRoutes);
+router.use("/app-reviews", appReviewRoutes);
 
 export default router;

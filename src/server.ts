@@ -1,5 +1,6 @@
 import "express-async-errors";
 import express from "express";
+import path from "path";
 import { serverConfig } from "@/config/server";
 import { setupMiddleware } from "@/middleware/setup";
 import { setupSwagger } from "@/middleware/swagger";
@@ -25,6 +26,12 @@ export class Server {
 
     // Setup Swagger documentation
     setupSwagger(this.app);
+
+    // Serve static files from uploads directory
+    this.app.use(
+      "/uploads",
+      express.static(path.join(__dirname, "../uploads"))
+    );
 
     // Health check endpoint
     this.app.get("/health", (req, res) => {

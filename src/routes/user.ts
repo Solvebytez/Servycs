@@ -505,10 +505,22 @@ router.post(
 
       const newRole = role.toUpperCase() as UserRole;
 
-      // Update user role
+      // Import required utilities
+      const { generateSessionId, generateAccessToken } = await import(
+        "@/utils/jwt"
+      );
+      const { blacklistAllUserTokens } = await import("@/utils/blacklistToken");
+
+      // Generate new session ID for role switch (maintains single device login)
+      const newSessionId = generateSessionId();
+
+      // Update user role and session ID
       const updatedUser = await prisma.user.update({
         where: { id: userId },
-        data: { role: newRole },
+        data: {
+          role: newRole,
+          currentSessionId: newSessionId,
+        },
         select: {
           id: true,
           email: true,
@@ -516,9 +528,21 @@ router.post(
           role: true,
           status: true,
           isEmailVerified: true,
+          currentSessionId: true,
           createdAt: true,
           updatedAt: true,
         },
+      });
+
+      // Blacklist all existing tokens for this user (single device login)
+      await blacklistAllUserTokens(userId);
+
+      // Generate new access token with new session ID
+      const newAccessToken = generateAccessToken({
+        userId: updatedUser.id,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        sessionId: newSessionId,
       });
 
       return res.json({
@@ -526,6 +550,7 @@ router.post(
         message: `Role switched to ${newRole} successfully`,
         data: {
           user: updatedUser,
+          accessToken: newAccessToken,
         },
       });
     } catch (error) {
@@ -959,6 +984,116 @@ router.delete(
         error: process.env.NODE_ENV === "development" ? error : undefined,
       });
     }
+  }
+);
+
+// Import user favorites controller and validators
+import {
+  getUserFavorites,
+  addToFavorites,
+  removeFromFavorites,
+  checkFavoriteStatus,
+} from "@/controllers/userFavoritesController";
+import {
+  getUserFavoritesValidation,
+  addToFavoritesValidation,
+  removeFromFavoritesValidation,
+  checkFavoriteStatusValidation,
+} from "@/validators/userFavoritesValidators";
+
+// GET /users/:userId/favorites - Get user's favorite service listings
+router.get(
+  "/:userId/favorites",
+  authenticate,
+  validateRequest,
+  getUserFavoritesValidation,
+  async (req: Request, res: Response) => {
+    // Check if user is accessing their own favorites or is admin
+    const authenticatedUserId = (req as any).user.id;
+    const requestedUserId = req.params.userId;
+    const userRole = (req as any).user.role;
+
+    if (authenticatedUserId !== requestedUserId && userRole !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "You can only access your own favorites",
+      });
+    }
+
+    // Call the controller
+    return getUserFavorites(req as any, res);
+  }
+);
+
+// POST /users/:userId/favorites/:serviceId - Add service to favorites
+router.post(
+  "/:userId/favorites/:serviceId",
+  authenticate,
+  validateRequest,
+  addToFavoritesValidation,
+  async (req: Request, res: Response) => {
+    // Check if user is adding to their own favorites or is admin
+    const authenticatedUserId = (req as any).user.id;
+    const requestedUserId = req.params.userId;
+    const userRole = (req as any).user.role;
+
+    if (authenticatedUserId !== requestedUserId && userRole !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "You can only add to your own favorites",
+      });
+    }
+
+    // Call the controller
+    return addToFavorites(req as any, res);
+  }
+);
+
+// DELETE /users/:userId/favorites/:serviceId - Remove service from favorites
+router.delete(
+  "/:userId/favorites/:serviceId",
+  authenticate,
+  validateRequest,
+  removeFromFavoritesValidation,
+  async (req: Request, res: Response) => {
+    // Check if user is removing from their own favorites or is admin
+    const authenticatedUserId = (req as any).user.id;
+    const requestedUserId = req.params.userId;
+    const userRole = (req as any).user.role;
+
+    if (authenticatedUserId !== requestedUserId && userRole !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "You can only remove from your own favorites",
+      });
+    }
+
+    // Call the controller
+    return removeFromFavorites(req as any, res);
+  }
+);
+
+// GET /users/:userId/favorites/:serviceId/status - Check if service is in favorites
+router.get(
+  "/:userId/favorites/:serviceId/status",
+  authenticate,
+  validateRequest,
+  checkFavoriteStatusValidation,
+  async (req: Request, res: Response) => {
+    // Check if user is checking their own favorites or is admin
+    const authenticatedUserId = (req as any).user.id;
+    const requestedUserId = req.params.userId;
+    const userRole = (req as any).user.role;
+
+    if (authenticatedUserId !== requestedUserId && userRole !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "You can only check your own favorites",
+      });
+    }
+
+    // Call the controller
+    return checkFavoriteStatus(req as any, res);
   }
 );
 
