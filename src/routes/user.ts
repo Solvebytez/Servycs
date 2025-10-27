@@ -38,6 +38,7 @@ router.get(
         select: {
           id: true,
           name: true,
+          username: true,
           email: true,
           phone: true,
           role: true,
@@ -68,6 +69,7 @@ router.get(
       let profileData: any = {
         id: user.id,
         name: user.name,
+        username: user.username,
         email: user.email,
         phone: user.phone,
         role: user.role,
@@ -116,7 +118,6 @@ router.get(
                   zipCode: true,
                   country: true,
                   description: true,
-                  isPrimary: true,
                 },
               },
             },
@@ -135,7 +136,6 @@ router.get(
               zipCode: addr.zipCode,
               country: addr.country,
               description: addr.description,
-              isPrimary: addr.isPrimary,
             })
           );
 
@@ -313,7 +313,6 @@ router.put(
               zipCode: addr.zipCode || "",
               country: addr.country || "India",
               description: addr.description || "",
-              isPrimary: addr.isPrimary || false,
             })),
           });
         }
@@ -353,6 +352,7 @@ router.put(
         select: {
           id: true,
           name: true,
+          username: true,
           email: true,
           phone: true,
           role: true,
@@ -376,6 +376,7 @@ router.put(
       let profileData: any = {
         id: updatedUser!.id,
         name: updatedUser!.name,
+        username: updatedUser!.username,
         email: updatedUser!.email,
         phone: updatedUser!.phone,
         role: updatedUser!.role,
@@ -424,7 +425,6 @@ router.put(
                   zipCode: true,
                   country: true,
                   description: true,
-                  isPrimary: true,
                 },
               },
             },
@@ -442,7 +442,6 @@ router.put(
             zipCode: addr.zipCode,
             country: addr.country,
             description: addr.description,
-            isPrimary: addr.isPrimary,
           }));
 
           profileData = {
@@ -524,6 +523,7 @@ router.post(
         select: {
           id: true,
           email: true,
+          username: true,
           name: true,
           role: true,
           status: true,
@@ -533,6 +533,43 @@ router.post(
           updatedAt: true,
         },
       });
+
+      // Create role-specific records if they don't exist
+      if (newRole === "VENDOR") {
+        const existingVendor = await prisma.vendor.findUnique({
+          where: { userId: userId },
+        });
+
+        if (!existingVendor) {
+          await prisma.vendor.create({
+            data: {
+              userId: userId,
+              businessName: `${updatedUser.name}'s Business`,
+              businessEmail: updatedUser.email,
+              businessPhone: "",
+              businessDescription: "",
+              businessLicense: null,
+              businessInsurance: null,
+              businessCertifications: [],
+            },
+          });
+          console.log(`Created vendor record for user ${userId}`);
+        }
+      } else if (newRole === "SALESMAN") {
+        const existingSalesman = await prisma.salesman.findUnique({
+          where: { userId: userId },
+        });
+
+        if (!existingSalesman) {
+          await prisma.salesman.create({
+            data: {
+              userId: userId,
+              territory: "General",
+            },
+          });
+          console.log(`Created salesman record for user ${userId}`);
+        }
+      }
 
       // Blacklist all existing tokens for this user (single device login)
       await blacklistAllUserTokens(userId);
@@ -599,13 +636,11 @@ router.get(
               zipCode: true,
               country: true,
               description: true,
-              isPrimary: true,
               createdAt: true,
               updatedAt: true,
             },
             orderBy: [
-              { isPrimary: "desc" }, // Primary addresses first
-              { createdAt: "asc" }, // Then by creation date
+              { createdAt: "asc" }, // Order by creation date
             ],
           },
         },
@@ -690,10 +725,6 @@ router.post(
       .trim()
       .isLength({ max: 1000 })
       .withMessage("Description must not exceed 1000 characters"),
-    body("isPrimary")
-      .optional()
-      .isBoolean()
-      .withMessage("isPrimary must be a boolean value"),
   ],
   async (req: Request, res: Response) => {
     try {
@@ -727,19 +758,6 @@ router.post(
         });
       }
 
-      // If this is being set as primary, unset other primary addresses
-      if (addressData.isPrimary) {
-        await prisma.businessAddress.updateMany({
-          where: {
-            vendorId: vendor.id,
-            isPrimary: true,
-          },
-          data: {
-            isPrimary: false,
-          },
-        });
-      }
-
       // Create the new business address
       const newAddress = await prisma.businessAddress.create({
         data: {
@@ -751,7 +769,6 @@ router.post(
           zipCode: addressData.zipCode || null,
           country: addressData.country || "India",
           description: addressData.description || null,
-          isPrimary: addressData.isPrimary || false,
         },
         select: {
           id: true,
@@ -762,7 +779,6 @@ router.post(
           zipCode: true,
           country: true,
           description: true,
-          isPrimary: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -896,7 +912,6 @@ router.put(
           zipCode: true,
           country: true,
           description: true,
-          isPrimary: true,
           createdAt: true,
           updatedAt: true,
         },

@@ -52,40 +52,171 @@ interface TokenAuthRequest extends Request {
 
 // Register new user
 export const register = async (req: Request, res: Response): Promise<void> => {
-  const { name, email, password, phone, role = "USER" } = req.body;
+  const {
+    name,
+    email,
+    password,
+    phone,
+    role = "USER",
+    username,
+    createdBy,
+  } = req.body;
 
-  // Check if user already exists
+  // Check if user already exists by email
   const existingUser = await prisma.user.findUnique({
     where: { email },
   });
 
+  let user;
   if (existingUser) {
-    throw new CustomError("User with this email already exists", 400);
-  }
+    // If user exists and is already verified, throw error
+    if (existingUser.isEmailVerified) {
+      throw new CustomError("User with this email already exists", 409);
+    }
 
-  // Hash password
-  const saltRounds = parseInt(process.env.BCRYPT_ROUNDS || "12");
-  const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-  // Create user
-  const user = await prisma.user.create({
-    data: {
+    // If user exists but is not verified, update the existing user with latest data
+    const updateData: any = {
       name,
-      email,
-      password: hashedPassword,
       phone,
       role: role as UserRole,
       status: UserStatus.PENDING,
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      status: true,
-      createdAt: true,
-    },
-  });
+      createdBy: createdBy || null,
+      // Clear any existing OTP data to ensure fresh OTP
+      otpCode: null,
+      otpExpiresAt: null,
+      otpAttempts: 0,
+    };
+
+    // Update username if provided
+    if (username) {
+      const { validateUsername, normalizeUsername } = await import(
+        "@/utils/usernameUtils"
+      );
+      await validateUsername(username, existingUser.id); // Pass existing user ID to exclude from validation
+      updateData.username = normalizeUsername(username);
+    }
+
+    // Update password
+    const saltRounds = parseInt(process.env.BCRYPT_ROUNDS || "12");
+    updateData.password = await bcrypt.hash(password, saltRounds);
+
+    user = await prisma.user.update({
+      where: { id: existingUser.id },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        role: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+  } else {
+    // If username provided, validate it BEFORE creating user
+    if (username) {
+      const { validateUsername } = await import("@/utils/usernameUtils");
+      await validateUsername(username);
+    }
+
+    // Create new user
+    const saltRounds = parseInt(process.env.BCRYPT_ROUNDS || "12");
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Normalize username if provided
+    const { normalizeUsername } = await import("@/utils/usernameUtils");
+    const normalizedUsername = username
+      ? normalizeUsername(username)
+      : undefined;
+
+    user = await prisma.user.create({
+      data: {
+        name,
+        username: normalizedUsername,
+        email,
+        password: hashedPassword,
+        phone,
+        role: role as UserRole,
+        status: UserStatus.PENDING,
+        createdBy: createdBy || null, // Store who created this user (salesman ID)
+      },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        role: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  // Create or update Vendor record if role is VENDOR
+  if (role === "VENDOR") {
+    const vendorData = {
+      userId: user.id,
+      businessName: name, // Use name as default business name
+      businessEmail: email,
+      businessPhone: phone || "",
+      businessDescription: null,
+      businessLicense: null,
+      businessInsurance: null,
+      businessCertifications: [],
+      businessHours: null,
+      verificationStatus: UserStatus.PENDING,
+      isVerified: false,
+      rating: 0,
+      totalReviews: 0,
+      totalBookings: 0,
+      totalRevenue: 0,
+    };
+
+    // Check if Vendor record already exists
+    const existingVendor = await prisma.vendor.findUnique({
+      where: { userId: user.id },
+    });
+
+    if (existingVendor) {
+      // Update existing Vendor record
+      await prisma.vendor.update({
+        where: { userId: user.id },
+        data: {
+          businessName: name,
+          businessEmail: email,
+          businessPhone: phone || "",
+          verificationStatus: UserStatus.PENDING,
+          isVerified: false,
+        },
+      });
+    } else {
+      // Create new Vendor record
+      await prisma.vendor.create({
+        data: vendorData,
+      });
+    }
+  } else if (
+    existingUser &&
+    existingUser.role === "VENDOR" &&
+    role !== "VENDOR"
+  ) {
+    // If user is switching from VENDOR to another role, delete Vendor record
+    await prisma.vendor.deleteMany({
+      where: { userId: user.id },
+    });
+  }
+
+  // If createdBy is provided, validate that the user exists
+  if (createdBy) {
+    const creatorUser = await prisma.user.findUnique({
+      where: { id: createdBy },
+    });
+
+    if (!creatorUser) {
+      throw new CustomError("Invalid createdBy user ID", 400);
+    }
+  }
 
   // Generate tokens
   const accessToken = generateAccessToken({
@@ -98,16 +229,68 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     userId: user.id,
   });
 
+  // Update salesman metrics if user was created by a salesman
+  if (createdBy) {
+    try {
+      // Find the salesman who created this user
+      const salesman = await prisma.salesman.findUnique({
+        where: { userId: createdBy },
+      });
+
+      if (salesman) {
+        // Update the salesman's metrics based on user role
+        const updateData: any = {};
+
+        if (role === "VENDOR") {
+          updateData.vendorsOnboarded = { increment: 1 };
+        } else if (role === "USER") {
+          updateData.usersOnboarded = { increment: 1 };
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          await prisma.salesman.update({
+            where: { userId: createdBy },
+            data: updateData,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error updating salesman metrics:", error);
+      // Don't fail the registration if metrics update fails
+    }
+  }
+
   // Set refresh token in cookie
   setRefreshTokenCookie(res, refreshToken);
 
-  // Send verification email
-  await sendVerificationEmail(user.email, user.id);
+  // Send OTP for LOCAL provider (register function is always LOCAL)
+  // No need to check provider since register function is always LOCAL
+  {
+    // Generate and store OTP
+    const { generateOTPWithExpiration, storeOTP } = await import(
+      "@/utils/otpUtils"
+    );
+
+    const { otpCode, expiresAt } = generateOTPWithExpiration();
+    await storeOTP(user.id, otpCode, expiresAt);
+
+    // Send OTP email
+    const userName = user.name || user.email.split("@")[0] || "User";
+    const template = emailTemplates.otpVerification(userName, otpCode);
+
+    await sendEmail({
+      to: user.email,
+      subject: template.subject,
+      html: template.html,
+    });
+  }
 
   res.status(201).json({
     success: true,
     message:
-      "User registered successfully. Please check your email for verification.",
+      existingUser && !existingUser.isEmailVerified
+        ? "Registration updated successfully. Please check your email for verification."
+        : "User registered successfully. Please check your email for verification.",
     data: {
       user: {
         id: user.id,
@@ -123,17 +306,14 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
 // Login user
 export const login = async (req: Request, res: Response): Promise<void> => {
-  const { email, password } = req.body;
+  const { identifier, password } = req.body;
 
-  // Find user
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: {
-      vendor: true,
-      salesman: true,
-      admin: true,
-    },
-  });
+  console.log("🔍 Login request received with identifier:", identifier);
+  console.log("📝 Password provided:", !!password);
+
+  // Find user by email or username
+  const { findUserByIdentifier } = await import("@/utils/identifierUtils");
+  const user = await findUserByIdentifier(identifier);
 
   if (!user) {
     throw new CustomError("Invalid credentials", 401);
@@ -145,10 +325,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     throw new CustomError("Invalid credentials", 401);
   }
 
+  // Check if email is verified
+  if (!user.isEmailVerified) {
+    throw new CustomError("Please verify your email before logging in", 403);
+  }
+
   // Check if user is active
   if (user.status !== UserStatus.ACTIVE) {
     throw new CustomError(
-      "Account is not active. Please verify your email or contact support.",
+      "Account is not active. Please contact support.",
       401
     );
   }
@@ -180,11 +365,30 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     userId: user.id,
   });
 
-  // Set refresh token in cookie
+  // Debug: Log refresh token generation
+  console.log("🔍 Refresh token generated:", {
+    hasRefreshToken: !!refreshToken,
+    refreshTokenLength: refreshToken?.length || 0,
+    refreshTokenPreview: refreshToken
+      ? refreshToken.substring(0, 20) + "..."
+      : "undefined",
+  });
+
+  // Set refresh token in cookie (for web browsers)
   setRefreshTokenCookie(res, refreshToken);
+  console.log("✅ Refresh token set in cookie for web browsers");
 
   // Get user's profile picture
   const profilePicture = await getUserProfilePicture(user.id);
+
+  console.log("🎉 Login successful, returning tokens");
+
+  // Debug: Log what we're sending in response
+  console.log("🔍 Response data being sent:", {
+    hasAccessToken: !!accessToken,
+    hasRefreshToken: !!refreshToken,
+    refreshTokenInResponse: refreshToken ? "YES" : "NO",
+  });
 
   res.json({
     success: true,
@@ -193,6 +397,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       user: {
         id: user.id,
         name: user.name,
+        username: user.username,
         email: user.email,
         role: user.role,
         status: user.status,
@@ -202,6 +407,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         admin: user.admin,
       },
       accessToken,
+      refreshToken, // Also return in response body for React Native
     },
   });
 };
@@ -243,15 +449,28 @@ export const refreshToken = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const { refreshToken: token } = req.cookies;
+  console.log("=== REFRESH TOKEN ENDPOINT CALLED ===");
+  console.log("Request headers:", JSON.stringify(req.headers, null, 2));
+  console.log("Request cookies:", JSON.stringify(req.cookies, null, 2));
+
+  // Import the new extractRefreshToken function
+  const { extractRefreshToken } = await import("@/utils/jwt");
+
+  // Extract refresh token from both cookie and Bearer header
+  const token = extractRefreshToken(req);
 
   if (!token) {
+    console.log("❌ No refresh token found in cookie or header");
     throw new CustomError("Refresh token required", 401);
   }
 
+  console.log("✅ Refresh token found, proceeding with verification");
+
   try {
+    console.log("🔍 Verifying refresh token...");
     // Verify refresh token
     const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET!) as any;
+    console.log("✅ Refresh token verified, user ID:", decoded.userId);
 
     // Find user
     const user = await prisma.user.findUnique({
@@ -266,8 +485,14 @@ export const refreshToken = async (
     });
 
     if (!user || user.status !== UserStatus.ACTIVE) {
+      console.log(
+        "❌ User not found or inactive:",
+        user ? user.status : "NOT_FOUND"
+      );
       throw new CustomError("Invalid refresh token", 401);
     }
+
+    console.log("✅ User found and active:", user.email, user.role);
 
     // Generate new access token with current session ID
     const accessToken = generateAccessToken({
@@ -277,26 +502,37 @@ export const refreshToken = async (
       sessionId: user.currentSessionId || undefined,
     });
 
+    console.log("✅ New access token generated");
+
     // Generate new refresh token
     const newRefreshToken = generateRefreshToken({
       userId: user.id,
     });
 
+    console.log("✅ New refresh token generated");
+
     // Set new refresh token in cookie
     setRefreshTokenCookie(res, newRefreshToken);
+    console.log("✅ New refresh token set in cookie");
 
+    console.log("🎉 Refresh token process completed successfully");
     res.json({
       success: true,
       data: {
         accessToken,
+        refreshToken: newRefreshToken, // Include new refresh token in response
       },
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.log("❌ Error in refresh token process:", error?.message || error);
     if (error instanceof jwt.TokenExpiredError) {
+      console.log("❌ Refresh token expired");
       throw new CustomError("Refresh token expired. Please login again.", 401);
     } else if (error instanceof jwt.JsonWebTokenError) {
+      console.log("❌ Invalid refresh token");
       throw new CustomError("Invalid refresh token", 401);
     } else {
+      console.log("❌ Unknown error:", error?.message || error);
       throw new CustomError("Invalid refresh token", 401);
     }
   }
@@ -480,18 +716,37 @@ export const tokenLogin = async (
 
   // Verify the token
   const tokenData = verifySignInToken(token);
-  const { email, name, avatar, provider, providerId, password, phone } =
-    tokenData;
+  const {
+    email,
+    name,
+    username,
+    avatar,
+    provider,
+    providerId,
+    password,
+    phone,
+  } = tokenData;
 
-  // Find existing user
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-    include: {
-      vendor: true,
-      salesman: true,
-      admin: true,
-    },
-  });
+  // Find existing user by email OR username (if email looks like a username)
+  let existingUser;
+
+  // Check if email field contains @ (actual email) or is a username
+  const isEmailFormat = email.includes("@");
+
+  if (isEmailFormat) {
+    existingUser = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        vendor: true,
+        salesman: true,
+        admin: true,
+      },
+    });
+  } else {
+    // Email field contains username, search by username instead
+    const { findUserByIdentifier } = await import("@/utils/identifierUtils");
+    existingUser = await findUserByIdentifier(email);
+  }
 
   // For LOCAL provider login, ensure password is provided
   if (provider === "LOCAL" && !password) {
@@ -566,6 +821,14 @@ export const tokenLogin = async (
     if (provider === "GOOGLE") {
       updateData.status = getUserStatusForProvider(provider);
       updateData.isEmailVerified = getEmailVerifiedForProvider(provider);
+
+      // Auto-generate username for existing Google users if they don't have one
+      if (!existingUser.username) {
+        const { generateUsernameFromEmail } = await import(
+          "@/utils/usernameUtils"
+        );
+        updateData.username = await generateUsernameFromEmail(email);
+      }
     }
     // For LOCAL provider, keep existing status and verification status
 
@@ -585,10 +848,17 @@ export const tokenLogin = async (
     // Only create new user for GOOGLE provider (OAuth)
     // LOCAL provider should never reach here due to validation above
     if (provider === "GOOGLE") {
+      // Auto-generate username for Google users
+      const { generateUsernameFromEmail } = await import(
+        "@/utils/usernameUtils"
+      );
+      const autoGeneratedUsername = await generateUsernameFromEmail(email);
+
       user = await prisma.user.create({
         data: {
           email,
           name,
+          username: autoGeneratedUsername,
           provider: provider,
           providerId: providerId,
           status: getUserStatusForProvider(provider),
@@ -681,6 +951,7 @@ export const tokenLogin = async (
       user: {
         id: user.id,
         name: user.name,
+        username: user.username,
         email: user.email,
         role: user.role,
         status: user.status,
@@ -692,6 +963,7 @@ export const tokenLogin = async (
         admin: user.admin,
       },
       accessToken,
+      refreshToken, // Add refresh token to response body for React Native
     },
   });
 };
@@ -713,8 +985,18 @@ export const tokenRegister = async (
 
   // Verify the token
   const tokenData = verifySignInToken(token);
-  const { email, name, avatar, provider, providerId, password, phone } =
-    tokenData;
+  const {
+    email,
+    name,
+    username,
+    avatar,
+    provider,
+    providerId,
+    password,
+    phone,
+    role,
+    createdBy,
+  } = tokenData;
 
   // Validate required fields for LOCAL provider
   if (provider === "LOCAL") {
@@ -729,6 +1011,24 @@ export const tokenRegister = async (
     }
     if (!name || name.trim().length < 2) {
       throw new CustomError("Name must be at least 2 characters long", 400);
+    }
+    // Username is required for LOCAL provider
+    if (!username || username.trim().length < 5) {
+      throw new CustomError("Username must be at least 5 characters long", 400);
+    }
+    // Validate username format and availability
+    const { validateUsername } = await import("@/utils/usernameUtils");
+    await validateUsername(username);
+  }
+
+  // If createdBy is provided, validate that the user exists
+  if (createdBy) {
+    const creatorUser = await prisma.user.findUnique({
+      where: { id: createdBy },
+    });
+
+    if (!creatorUser) {
+      throw new CustomError("Invalid createdBy user ID", 400);
     }
   }
 
@@ -762,6 +1062,18 @@ export const tokenRegister = async (
       updateData.phone = phone;
     }
 
+    // Handle username
+    if (provider === "LOCAL" && username) {
+      const { normalizeUsername } = await import("@/utils/usernameUtils");
+      updateData.username = normalizeUsername(username);
+    } else if (provider === "GOOGLE" && !existingUser.username) {
+      // Auto-generate username for Google users if they don't have one
+      const { generateUsernameFromEmail } = await import(
+        "@/utils/usernameUtils"
+      );
+      updateData.username = await generateUsernameFromEmail(email);
+    }
+
     // For LOCAL provider, update password if provided
     if (provider === "LOCAL" && password) {
       const saltRounds = parseInt(process.env.BCRYPT_ROUNDS || "12");
@@ -784,13 +1096,27 @@ export const tokenRegister = async (
       name,
       provider: provider,
       providerId: providerId,
+      role: role === "SALESMAN" ? "SALESMAN" : "USER", // Only SALESMAN gets SALESMAN role, everything else gets USER
       status: getUserStatusForProvider(provider),
       isEmailVerified: getEmailVerifiedForProvider(provider),
+      createdBy: createdBy || null, // Store who created this user (salesman ID)
     };
 
     // Add phone if provided
     if (phone) {
       userData.phone = phone;
+    }
+
+    // Handle username
+    if (provider === "LOCAL" && username) {
+      const { normalizeUsername } = await import("@/utils/usernameUtils");
+      userData.username = normalizeUsername(username);
+    } else if (provider === "GOOGLE") {
+      // Auto-generate username for Google users
+      const { generateUsernameFromEmail } = await import(
+        "@/utils/usernameUtils"
+      );
+      userData.username = await generateUsernameFromEmail(email);
     }
 
     // For LOCAL provider, hash and store password
@@ -808,6 +1134,33 @@ export const tokenRegister = async (
         admin: true,
       },
     });
+  }
+
+  // Create role-specific profile if needed
+  if (user.role === "SALESMAN") {
+    try {
+      await prisma.salesman.create({
+        data: {
+          userId: user.id,
+          territory: "General", // Default territory
+          targetVendors: 0, // Default targets
+          targetUsers: 0,
+          vendorsOnboarded: 0, // Initialize metrics
+          usersOnboarded: 0,
+          totalCommission: 0,
+        },
+      });
+      console.log("✅ Created salesman profile for user:", user.id);
+    } catch (error) {
+      console.error("❌ Error creating salesman profile:", error);
+      // Don't fail the registration if salesman profile creation fails
+    }
+  } else if (user.role === "VENDOR") {
+    // TODO: Add vendor profile creation logic if needed
+    console.log("📝 Vendor profile creation not implemented yet");
+  } else if (user.role === "ADMIN") {
+    // TODO: Add admin profile creation logic if needed
+    console.log("📝 Admin profile creation not implemented yet");
   }
 
   // Handle avatar from token data (if provided)
@@ -866,12 +1219,45 @@ export const tokenRegister = async (
     userId: user.id,
   });
 
-  // Set refresh token in cookie
+  // Set refresh token in cookie (for web browsers)
   setRefreshTokenCookie(res, refreshToken);
+  console.log("✅ Refresh token set in cookie for web browsers (registration)");
+
+  // Update salesman metrics if user was created by a salesman
+  if (createdBy) {
+    try {
+      // Find the salesman who created this user
+      const salesman = await prisma.salesman.findUnique({
+        where: { userId: createdBy },
+      });
+
+      if (salesman) {
+        // Update the salesman's metrics based on user role
+        const updateData: any = {};
+
+        if (user.role === "VENDOR") {
+          updateData.vendorsOnboarded = { increment: 1 };
+        } else if (user.role === "USER") {
+          updateData.usersOnboarded = { increment: 1 };
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          await prisma.salesman.update({
+            where: { userId: createdBy },
+            data: updateData,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error updating salesman metrics:", error);
+      // Don't fail the registration if metrics update fails
+    }
+  }
 
   // Get user's profile picture
   const profilePicture = await getUserProfilePicture(user.id);
 
+  console.log("🎉 Registration successful, returning tokens");
   res.status(201).json({
     success: true,
     message:
@@ -886,6 +1272,7 @@ export const tokenRegister = async (
       user: {
         id: user.id,
         name: user.name,
+        username: user.username,
         email: user.email,
         role: user.role,
         status: user.status,
@@ -897,6 +1284,7 @@ export const tokenRegister = async (
         admin: user.admin,
       },
       accessToken,
+      refreshToken, // Also return in response body for React Native
     },
   });
 };
@@ -1086,6 +1474,174 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
     data: {
       email: user.email,
       expiresAt: expiresAt.toISOString(),
+    },
+  });
+};
+
+// Check username availability
+export const checkUsername = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { username } = req.params;
+
+  if (!username) {
+    throw new CustomError("Username is required", 400);
+  }
+
+  const { isUsernameAvailable, isUsernameReserved, validateUsernameFormat } =
+    await import("@/utils/usernameUtils");
+
+  // Check format
+  if (!validateUsernameFormat(username)) {
+    res.json({
+      success: true,
+      data: {
+        available: false,
+        reason: "invalid_format",
+        message:
+          "Username must start with a letter and contain only lowercase letters, numbers, underscores, and hyphens (5-30 characters)",
+      },
+    });
+    return;
+  }
+
+  // Check if reserved
+  if (isUsernameReserved(username)) {
+    res.json({
+      success: true,
+      data: {
+        available: false,
+        reason: "reserved",
+        message: "This username is reserved and cannot be used",
+      },
+    });
+    return;
+  }
+
+  // Check availability
+  const available = await isUsernameAvailable(username);
+
+  res.json({
+    success: true,
+    data: {
+      available,
+      reason: available ? null : "taken",
+      message: available
+        ? "Username is available"
+        : "This username is already taken",
+    },
+  });
+};
+
+// Resend OTP for vendor verification
+export const resendVendorOTP = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { vendorId } = req.params;
+
+  try {
+    // Find the vendor user
+    const user = await prisma.user.findUnique({
+      where: { id: vendorId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isEmailVerified: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      throw new CustomError("Vendor not found", 404);
+    }
+
+    // Check if already verified
+    if (user.isEmailVerified) {
+      throw new CustomError("Email is already verified", 400);
+    }
+
+    // Generate and store new OTP
+    const { generateOTPWithExpiration, storeOTP } = await import(
+      "@/utils/otpUtils"
+    );
+
+    const { otpCode, expiresAt } = generateOTPWithExpiration();
+    await storeOTP(user.id, otpCode, expiresAt);
+
+    // Send OTP email
+    const userName = user.name || user.email.split("@")[0] || "User";
+    const template = emailTemplates.otpVerification(userName, otpCode);
+
+    await sendEmail({
+      to: user.email,
+      subject: template.subject,
+      html: template.html,
+    });
+
+    res.json({
+      success: true,
+      message: "OTP sent successfully to vendor's email",
+      data: {
+        vendorId: user.id,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error("Resend OTP error:", error);
+    if (error instanceof CustomError) {
+      res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: "Failed to resend OTP",
+      });
+    }
+  }
+};
+
+// Update username
+export const updateUsername = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  const { username } = req.body;
+  const userId = req.user!.id;
+
+  if (!username) {
+    throw new CustomError("Username is required", 400);
+  }
+
+  // Validate username
+  const { validateUsername: validateUsernameUtil, normalizeUsername } =
+    await import("@/utils/usernameUtils");
+  await validateUsernameUtil(username, userId);
+
+  // Update username
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      username: normalizeUsername(username),
+    },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      name: true,
+      role: true,
+    },
+  });
+
+  res.json({
+    success: true,
+    message: "Username updated successfully",
+    data: {
+      user: updatedUser,
     },
   });
 };

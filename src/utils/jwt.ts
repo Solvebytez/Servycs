@@ -68,6 +68,42 @@ export const extractTokenFromHeader = (req: Request): string | null => {
   return authHeader.substring(7);
 };
 
+// Extract refresh token from both cookie and Bearer header
+export const extractRefreshToken = (req: Request): string | null => {
+  console.log("=== EXTRACTING REFRESH TOKEN ===");
+
+  // Check cookie first (for web browsers)
+  const cookieToken = req.cookies?.refreshToken;
+  console.log("Cookie refresh token:", cookieToken ? "EXISTS" : "NOT FOUND");
+
+  // Check Bearer header (for React Native)
+  const authHeader = req.headers.authorization;
+  console.log("Authorization header:", authHeader ? "EXISTS" : "NOT FOUND");
+
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const headerToken = authHeader.substring(7);
+    console.log(
+      "Header token extracted:",
+      headerToken ? "EXISTS" : "NOT FOUND"
+    );
+
+    // Return header token if available, otherwise cookie token
+    const token = headerToken || cookieToken;
+    console.log(
+      "Final refresh token source:",
+      headerToken ? "HEADER" : "COOKIE"
+    );
+    console.log("Final refresh token:", token ? "EXISTS" : "NOT FOUND");
+    console.log("=================================");
+    return token;
+  }
+
+  console.log("Final refresh token source: COOKIE");
+  console.log("Final refresh token:", cookieToken ? "EXISTS" : "NOT FOUND");
+  console.log("=================================");
+  return cookieToken;
+};
+
 // Generate a unique session ID for single device login
 export const generateSessionId = (): string => {
   return crypto.randomBytes(32).toString("hex");

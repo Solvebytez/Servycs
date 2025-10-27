@@ -6,11 +6,14 @@ import { CustomError } from "@/middleware/errorHandler";
 export interface SignInTokenPayload {
   email: string;
   name?: string;
+  username?: string; // Optional username
   avatar?: string;
   provider: "LOCAL" | "GOOGLE";
   providerId?: string;
   password?: string; // Optional password for LOCAL provider validation
   phone?: string; // Optional phone number
+  role?: "USER" | "VENDOR" | "SALESMAN" | "ADMIN"; // Optional role for registration
+  createdBy?: string; // Optional ID of user who created this user (for salesman-created users)
   exp?: number;
   iat?: number;
 }
@@ -18,11 +21,14 @@ export interface SignInTokenPayload {
 export interface VerifiedSignInToken {
   email: string;
   name: string;
+  username?: string; // Optional username
   avatar?: string;
   provider: AuthProvider;
   providerId?: string;
   password?: string; // Optional password for LOCAL provider validation
   phone?: string; // Optional phone number
+  role?: "USER" | "VENDOR" | "SALESMAN" | "ADMIN"; // Optional role for registration
+  createdBy?: string; // Optional ID of user who created this user (for salesman-created users)
 }
 
 /**
@@ -52,11 +58,14 @@ export const verifySignInToken = (token: string): VerifiedSignInToken => {
     return {
       email: decoded.email.toLowerCase().trim(),
       name: decoded.name || extracted_name_from_email(decoded.email),
+      username: decoded.username, // Include username if provided
       avatar: decoded.avatar,
       provider: decoded.provider as AuthProvider,
       providerId: decoded.providerId,
       password: decoded.password, // Include password for validation
       phone: decoded.phone, // Include phone number
+      role: decoded.role, // Include role if provided
+      createdBy: decoded.createdBy, // Include createdBy if provided
     };
   } catch (error) {
     if (error instanceof CustomError) {

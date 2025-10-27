@@ -118,7 +118,7 @@ export const searchUsersValidation = [
     .withMessage("Invalid role"),
   query("status")
     .optional()
-    .isIn(["ACTIVE", "INACTIVE", "SUSPENDED", "PENDING", "VERIFIED"])
+    .isIn(["ACTIVE", "INACTIVE", "SUSPENDED", "PENDING"])
     .withMessage("Invalid status"),
   query("page")
     .optional()

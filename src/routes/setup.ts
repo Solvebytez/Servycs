@@ -10,6 +10,9 @@ import adminRoutes from "./admin";
 import uploadRoutes from "./upload";
 import promotionRoutes from "./promotion";
 import appReviewRoutes from "./appReview";
+import serviceReviewRoutes from "./serviceReview";
+import savedListsRoutes from "./savedLists";
+import salesmanRoutes from "./salesman";
 
 export const setupRoutes = (): Router => {
   const router = Router();
@@ -27,6 +30,7 @@ export const setupRoutes = (): Router => {
   // API Routes
   router.use("/auth", authRoutes);
   router.use("/users", userRoutes);
+  router.use("/users", savedListsRoutes); // Saved lists routes are under /users
   router.use("/vendors", vendorRoutes);
   router.use("/services", serviceRoutes);
   router.use("/bookings", bookingRoutes);
@@ -34,6 +38,8 @@ export const setupRoutes = (): Router => {
   router.use("/upload", uploadRoutes);
   router.use("/promotions", promotionRoutes);
   router.use("/app-reviews", appReviewRoutes);
+  router.use("/service-reviews", serviceReviewRoutes);
+  router.use("/salesmen", salesmanRoutes);
 
   return router;
 };

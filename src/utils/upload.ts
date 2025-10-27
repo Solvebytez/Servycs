@@ -3,6 +3,8 @@ import { v2 as cloudinary } from "cloudinary";
 import { Request } from "express";
 import { CustomError } from "@/middleware/errorHandler";
 import { env } from "@/config/env";
+import fs from "fs";
+import path from "path";
 
 // Configure Cloudinary
 cloudinary.config({
@@ -261,5 +263,39 @@ export const uploadBufferToCloudinary = async (
     return (result as any).secure_url;
   } catch (error) {
     throw new CustomError("Failed to upload buffer to Cloudinary", 500);
+  }
+};
+
+// Delete local file
+export const deleteLocalFile = (filePath: string): void => {
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log("✅ Local file deleted:", filePath);
+    } else {
+      console.log("⚠️ Local file not found:", filePath);
+    }
+  } catch (error) {
+    console.error("❌ Failed to delete local file:", filePath, error);
+    // Don't throw error as this shouldn't break the upload process
+  }
+};
+
+// Upload to Cloudinary and cleanup local file
+export const uploadToCloudinaryAndCleanup = async (
+  file: Express.Multer.File,
+  folder: string = "listro"
+): Promise<string> => {
+  try {
+    const cloudinaryUrl = await uploadToCloudinary(file, folder);
+
+    // Delete local file after successful Cloudinary upload
+    deleteLocalFile(file.path);
+
+    return cloudinaryUrl;
+  } catch (error) {
+    // If Cloudinary upload fails, still try to delete local file
+    deleteLocalFile(file.path);
+    throw error;
   }
 };

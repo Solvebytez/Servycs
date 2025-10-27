@@ -15,7 +15,9 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
-    "seed:categories": "ts-node -r tsconfig-paths/register src/scripts/seedCategories.ts"
+    "seed:categories": "ts-node -r tsconfig-paths/register src/scripts/seedCategories.ts",
+    "seed:users": "ts-node -r tsconfig-paths/register src/scripts/seedUsers.ts",
+    "check:salesmen": "ts-node -r tsconfig-paths/register src/scripts/checkSalesmen.ts"
   },
   "keywords": [
     "listro",

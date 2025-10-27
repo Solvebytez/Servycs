@@ -31,7 +31,7 @@ interface UserFavoriteResponse {
       id: string;
       name: string;
       slug: string;
-    };
+    } | null;
     vendor: {
       id: string;
       businessName: string;
@@ -45,7 +45,7 @@ interface UserFavoriteResponse {
       address: string;
       city: string;
       state: string;
-    };
+    } | null;
   };
 }
 
@@ -159,11 +159,13 @@ export const getUserFavorites = async (
           image: favorite.serviceListing.image || undefined,
           rating: favorite.serviceListing.rating,
           totalReviews: favorite.serviceListing.totalReviews,
-          category: {
-            id: favorite.serviceListing.category.id,
-            name: favorite.serviceListing.category.name,
-            slug: favorite.serviceListing.category.slug,
-          },
+          category: favorite.serviceListing.category
+            ? {
+                id: favorite.serviceListing.category.id,
+                name: favorite.serviceListing.category.name,
+                slug: favorite.serviceListing.category.slug,
+              }
+            : null,
           vendor: {
             id: favorite.serviceListing.vendor.id,
             businessName: favorite.serviceListing.vendor.businessName,
@@ -171,13 +173,15 @@ export const getUserFavorites = async (
             businessPhone: favorite.serviceListing.vendor.businessPhone,
             rating: favorite.serviceListing.vendor.rating,
           },
-          address: {
-            id: favorite.serviceListing.address.id,
-            name: favorite.serviceListing.address.name,
-            address: favorite.serviceListing.address.address,
-            city: favorite.serviceListing.address.city,
-            state: favorite.serviceListing.address.state,
-          },
+          address: favorite.serviceListing.address
+            ? {
+                id: favorite.serviceListing.address.id,
+                name: favorite.serviceListing.address.name,
+                address: favorite.serviceListing.address.address,
+                city: favorite.serviceListing.address.city,
+                state: favorite.serviceListing.address.state,
+              }
+            : null,
         },
       })
     );
@@ -344,11 +348,13 @@ export const addToFavorites = async (
         image: favorite.serviceListing.image || undefined,
         rating: favorite.serviceListing.rating,
         totalReviews: favorite.serviceListing.totalReviews,
-        category: {
-          id: favorite.serviceListing.category.id,
-          name: favorite.serviceListing.category.name,
-          slug: favorite.serviceListing.category.slug,
-        },
+        category: favorite.serviceListing.category
+          ? {
+              id: favorite.serviceListing.category.id,
+              name: favorite.serviceListing.category.name,
+              slug: favorite.serviceListing.category.slug,
+            }
+          : null,
         vendor: {
           id: favorite.serviceListing.vendor.id,
           businessName: favorite.serviceListing.vendor.businessName,
@@ -356,13 +362,15 @@ export const addToFavorites = async (
           businessPhone: favorite.serviceListing.vendor.businessPhone,
           rating: favorite.serviceListing.vendor.rating,
         },
-        address: {
-          id: favorite.serviceListing.address.id,
-          name: favorite.serviceListing.address.name,
-          address: favorite.serviceListing.address.address,
-          city: favorite.serviceListing.address.city,
-          state: favorite.serviceListing.address.state,
-        },
+        address: favorite.serviceListing.address
+          ? {
+              id: favorite.serviceListing.address.id,
+              name: favorite.serviceListing.address.name,
+              address: favorite.serviceListing.address.address,
+              city: favorite.serviceListing.address.city,
+              state: favorite.serviceListing.address.state,
+            }
+          : null,
       },
     };
 

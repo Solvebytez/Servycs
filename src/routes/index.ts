@@ -10,6 +10,8 @@ import promotionRoutes from "./promotion";
 import categoryRoutes from "./category";
 import adminCategoriesRoutes from "./adminCategories";
 import appReviewRoutes from "./appReview";
+import serviceReviewRoutes from "./serviceReview";
+import savedListsRoutes from "./savedLists";
 
 const router = Router();
 
@@ -26,6 +28,7 @@ router.get("/health", (req, res) => {
 // API Routes
 router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
+router.use("/users", savedListsRoutes); // Saved lists routes are under /users
 router.use("/vendors", vendorRoutes);
 router.use("/services", serviceRoutes);
 router.use("/bookings", bookingRoutes);
@@ -35,5 +38,6 @@ router.use("/categories", categoryRoutes);
 router.use("/upload", uploadRoutes);
 router.use("/promotions", promotionRoutes);
 router.use("/app-reviews", appReviewRoutes);
+router.use("/service-reviews", serviceReviewRoutes);
 
 export default router;

@@ -25,6 +25,12 @@ export const getRootCategories = async (req: Request, res: Response) => {
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
 
+    console.log(
+      "🔍 Backend getRootCategories - Found categories:",
+      categories.length
+    );
+    console.log("🔍 Backend getRootCategories - Categories data:", categories);
+
     return res.status(200).json({
       success: true,
       data: categories,
@@ -154,7 +160,7 @@ export const getCategoryById = async (req: Request, res: Response) => {
         _count: {
           select: {
             children: true,
-            services: true,
+            Service: true,
           },
         },
       },
@@ -181,6 +187,104 @@ export const getCategoryById = async (req: Request, res: Response) => {
   }
 };
 
+// Search categories by query
+export const searchCategories = async (req: Request, res: Response) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || typeof q !== "string" || q.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Search query is required",
+      });
+    }
+
+    const query = q.trim().toLowerCase();
+
+    // Search in category names and paths
+    const categories = await prisma.category.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          {
+            name: {
+              contains: query,
+              mode: "insensitive",
+            },
+          },
+          {
+            slug: {
+              contains: query,
+              mode: "insensitive",
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        parentId: true,
+        sortOrder: true,
+        isActive: true,
+        _count: {
+          select: {
+            children: true,
+            Service: true,
+          },
+        },
+      },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      take: 50, // Limit results to 50 for performance
+    });
+
+    // Build category paths for each result
+    const categoriesWithPaths = await Promise.all(
+      categories.map(async (category) => {
+        let path = category.name;
+
+        // Build full path by traversing up the parent chain
+        let currentParentId = category.parentId;
+        const pathParts = [category.name];
+
+        while (currentParentId) {
+          const parent = await prisma.category.findUnique({
+            where: { id: currentParentId },
+            select: { name: true, parentId: true },
+          });
+
+          if (parent) {
+            pathParts.unshift(parent.name);
+            currentParentId = parent.parentId;
+          } else {
+            break;
+          }
+        }
+
+        path = pathParts.join(" > ");
+
+        return {
+          ...category,
+          path,
+        };
+      })
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: categoriesWithPaths,
+      message: "Categories search completed successfully",
+    });
+  } catch (error) {
+    logger.error("Error searching categories:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
 // Get all categories as flat list for client-side tree building
 export const getAllCategoriesFlat = async (req: Request, res: Response) => {
   try {
@@ -199,7 +303,7 @@ export const getAllCategoriesFlat = async (req: Request, res: Response) => {
         _count: {
           select: {
             children: true,
-            services: true,
+            Service: true,
           },
         },
       },
@@ -485,7 +589,7 @@ export const deleteCategory = async (req: Request, res: Response) => {
         _count: {
           select: {
             children: true,
-            services: true,
+            Service: true,
           },
         },
       },
@@ -508,7 +612,7 @@ export const deleteCategory = async (req: Request, res: Response) => {
     }
 
     // Check if category has services
-    if (category._count.services > 0) {
+    if (category._count.Service > 0) {
       return res.status(400).json({
         success: false,
         message:

@@ -8,6 +8,7 @@ import {
   getCategoryById,
   getAllCategoriesFlat,
   getCategoryTree,
+  searchCategories,
   createCategory,
   updateCategory,
   deleteCategory,
@@ -27,6 +28,7 @@ const router = Router();
 // Public routes (no authentication required)
 router.get("/primary", getRootCategories);
 router.get("/tree", getAllCategoriesFlat);
+router.get("/search", searchCategories);
 router.get(
   "/:id/children",
   getCategoryChildrenValidation,

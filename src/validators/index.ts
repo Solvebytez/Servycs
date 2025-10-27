@@ -7,3 +7,4 @@ export * from "./bookingValidators";
 export * from "./uploadValidators";
 export * from "./adminValidators";
 export * from "./promotionValidators";
+export * from "./savedListsValidators";

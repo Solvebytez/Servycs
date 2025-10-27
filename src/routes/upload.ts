@@ -4,6 +4,7 @@ import {
   uploadSingle,
   uploadMultiple,
   uploadToCloudinary,
+  uploadToCloudinaryAndCleanup,
   deleteFromCloudinary,
   extractPublicId,
 } from "@/utils/upload";
@@ -63,8 +64,8 @@ router.post(
       }
 
       console.log("✅ File received, uploading to Cloudinary...");
-      // Upload to Cloudinary
-      const cloudinaryUrl = await uploadToCloudinary(
+      // Upload to Cloudinary and cleanup local file
+      const cloudinaryUrl = await uploadToCloudinaryAndCleanup(
         req.file,
         "listro/profile-pictures"
       );
@@ -309,8 +310,8 @@ router.post(
       }
 
       console.log("✅ File received, uploading to Cloudinary...");
-      // Upload to Cloudinary
-      const cloudinaryUrl = await uploadToCloudinary(
+      // Upload to Cloudinary and cleanup local file
+      const cloudinaryUrl = await uploadToCloudinaryAndCleanup(
         req.file,
         "listro/promotion-banners"
       );
@@ -414,8 +415,8 @@ router.post(
       }
 
       console.log("✅ File received, uploading to Cloudinary...");
-      // Upload to Cloudinary
-      const cloudinaryUrl = await uploadToCloudinary(
+      // Upload to Cloudinary and cleanup local file
+      const cloudinaryUrl = await uploadToCloudinaryAndCleanup(
         req.file,
         "listro/service-images"
       );
@@ -490,6 +491,63 @@ router.post("/single", authenticate, uploadSingle, (req, res) => {
 // Multiple files upload endpoint
 router.post("/multiple", authenticate, uploadMultiple, (req, res) => {
   res.json({ message: "Multiple files upload route - to be implemented" });
+});
+
+// Delete image endpoint
+router.delete("/image", authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { imageUrl } = req.body;
+    
+    if (!imageUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "Image URL is required",
+      });
+    }
+
+    console.log("🗑️ DELETE IMAGE - Starting deletion process");
+    console.log("Image URL:", imageUrl);
+
+    // Extract public ID from Cloudinary URL
+    const publicId = extractPublicId(imageUrl);
+    console.log("Public ID:", publicId);
+
+    if (!publicId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid image URL - cannot extract public ID",
+      });
+    }
+
+    // Delete from Cloudinary
+    await deleteFromCloudinary(publicId);
+    console.log("✅ Image deleted from Cloudinary successfully");
+
+    // Find and delete image record from database
+    const imageRecord = await prisma.image.findFirst({
+      where: { url: imageUrl },
+    });
+
+    if (imageRecord) {
+      await prisma.image.delete({
+        where: { id: imageRecord.id },
+      });
+      console.log("✅ Image record deleted from database");
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Image deleted successfully",
+    });
+
+  } catch (error) {
+    console.error("❌ DELETE IMAGE ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete image",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 });
 
 export default router;

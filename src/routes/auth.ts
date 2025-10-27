@@ -25,6 +25,8 @@ import {
   sendOTP,
   verifyOTPCode,
   resendOTP,
+  checkUsername,
+  updateUsername,
 } from "@/controllers/authController";
 import { getUserProfilePicture } from "@/utils/imageUtils";
 import {
@@ -35,6 +37,7 @@ import {
   verifyEmailValidation,
   resendVerificationValidation,
   tokenAuthValidation,
+  updateUsernameValidation,
 } from "@/validators/authValidators";
 
 const router = Router();
@@ -251,6 +254,7 @@ router.get(
         where: { id: req.user!.id },
         select: {
           id: true,
+          username: true,
           email: true,
           name: true,
           phone: true,
@@ -463,5 +467,16 @@ router.post("/verify-otp", verifyOTPCode);
  *               $ref: '#/components/schemas/Error'
  */
 router.post("/resend-otp", resendOTP);
+
+// Check username availability
+router.get("/check-username/:username", checkUsername);
+
+// Update username (protected route)
+router.put(
+  "/update-username",
+  authenticate,
+  [...updateUsernameValidation, validateRequest],
+  updateUsername
+);
 
 export default router;

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { logger } from "../utils/logger";
+import { deleteFromCloudinary, extractPublicId } from "../utils/upload";
 
 // Extend Request interface to include user
 interface AuthenticatedRequest extends Request {
@@ -835,6 +836,27 @@ export const deletePromotion = async (
     console.log(
       "✅ DELETE PROMOTION - Promotion found, proceeding with deletion"
     );
+
+    // Delete banner image from Cloudinary if it exists
+    if (existingPromotion.bannerImage) {
+      try {
+        console.log(
+          "🗑️ DELETE PROMOTION - Deleting banner image from Cloudinary:",
+          existingPromotion.bannerImage
+        );
+        const publicId = extractPublicId(existingPromotion.bannerImage);
+        await deleteFromCloudinary(publicId);
+        console.log(
+          "✅ DELETE PROMOTION - Banner image deleted from Cloudinary successfully"
+        );
+      } catch (imageDeleteError) {
+        console.error(
+          "⚠️ DELETE PROMOTION - Failed to delete banner image from Cloudinary:",
+          imageDeleteError
+        );
+        // Continue with promotion deletion even if image deletion fails
+      }
+    }
 
     // Delete promotion (cascade will handle related records)
     await prisma.promotion.delete({
