@@ -69,6 +69,7 @@ const toggleReviewHelpfulValidation = [
 // Public routes
 router.get(
   "/listing/:listingId",
+  authenticate,
   getServiceReviewsValidation,
   validateRequest,
   getServiceReviews

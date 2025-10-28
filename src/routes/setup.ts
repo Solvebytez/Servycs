@@ -13,6 +13,7 @@ import appReviewRoutes from "./appReview";
 import serviceReviewRoutes from "./serviceReview";
 import savedListsRoutes from "./savedLists";
 import salesmanRoutes from "./salesman";
+import enquiryRoutes from "./enquiry";
 
 export const setupRoutes = (): Router => {
   const router = Router();
@@ -40,6 +41,7 @@ export const setupRoutes = (): Router => {
   router.use("/app-reviews", appReviewRoutes);
   router.use("/service-reviews", serviceReviewRoutes);
   router.use("/salesmen", salesmanRoutes);
+  router.use("/enquiries", enquiryRoutes);
 
   return router;
 };

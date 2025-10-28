@@ -954,6 +954,8 @@ export const getServiceListings = async (req: Request, res: Response) => {
               totalBookings: true,
               createdAt: true,
               updatedAt: true,
+              categoryIds: true,
+              categoryPaths: true,
             },
           },
           promotionListings: {
@@ -1050,6 +1052,8 @@ export const getServiceListings = async (req: Request, res: Response) => {
                 totalBookings: true,
                 createdAt: true,
                 updatedAt: true,
+                categoryIds: true,
+                categoryPaths: true,
               },
             },
             promotionListings: {

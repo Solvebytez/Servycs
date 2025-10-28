@@ -17,8 +17,11 @@ function getPeriods(window: string) {
 }
 
 function calcGrowth(current: number, previous: number): number {
-  const denom = Math.max(previous, 1);
-  return Math.round(((current - previous) / denom) * 100);
+  // If there were no items in the previous period, return 0% growth
+  if (previous === 0) {
+    return 0;
+  }
+  return Math.round(((current - previous) / previous) * 100);
 }
 
 export const getVendorMetrics = async (req: Request, res: Response) => {
@@ -50,6 +53,7 @@ export const getVendorMetrics = async (req: Request, res: Response) => {
       reviewsTotal,
       reviewsCurrent,
       reviewsPrevious,
+      promotionsTotal,
       promotionsActive,
       promotionsCurrent,
       promotionsPrevious,
@@ -82,7 +86,11 @@ export const getVendorMetrics = async (req: Request, res: Response) => {
           createdAt: { gte: previous.from, lt: previous.to },
         },
       }),
-      prisma.review.count({ where: { vendorId: vendor.id } }),
+      prisma.review.count({
+        where: {
+          vendorId: vendor.id,
+        },
+      }),
       prisma.review.count({
         where: {
           vendorId: vendor.id,
@@ -95,6 +103,7 @@ export const getVendorMetrics = async (req: Request, res: Response) => {
           createdAt: { gte: previous.from, lt: previous.to },
         },
       }),
+      prisma.promotion.count({ where: { vendorId: vendor.id } }),
       prisma.promotion.count({
         where: { vendorId: vendor.id, status: "ACTIVE" as any },
       }),
@@ -111,6 +120,45 @@ export const getVendorMetrics = async (req: Request, res: Response) => {
         },
       }),
     ]);
+
+    // LOG ALL METRICS VALUES
+    console.log("🔍 VENDOR METRICS DEBUG:");
+    console.log("Listings:");
+    console.log("  - Total:", listingsTotal);
+    console.log("  - Current period:", listingsCurrent);
+    console.log("  - Previous period:", listingsPrevious);
+    console.log("  - Growth %:", calcGrowth(listingsCurrent, listingsPrevious));
+
+    console.log("Promotions:");
+    console.log("  - Total:", promotionsTotal);
+    console.log("  - Active:", promotionsActive);
+    console.log("  - Current period:", promotionsCurrent);
+    console.log("  - Previous period:", promotionsPrevious);
+    console.log(
+      "  - Growth %:",
+      calcGrowth(promotionsCurrent, promotionsPrevious)
+    );
+
+    console.log("Enquiries:");
+    console.log("  - Pending:", enquiriesPending);
+    console.log("  - Current period:", enquiriesCurrent);
+    console.log("  - Previous period:", enquiriesPrevious);
+    console.log(
+      "  - Growth %:",
+      calcGrowth(enquiriesCurrent, enquiriesPrevious)
+    );
+
+    console.log("Reviews:");
+    console.log("  - Total:", reviewsTotal);
+    console.log("  - Current period:", reviewsCurrent);
+    console.log("  - Previous period:", reviewsPrevious);
+    console.log("  - Growth %:", calcGrowth(reviewsCurrent, reviewsPrevious));
+
+    console.log("Period ranges:");
+    console.log("  - Current from:", current.from.toISOString());
+    console.log("  - Current to:", current.to.toISOString());
+    console.log("  - Previous from:", previous.from.toISOString());
+    console.log("  - Previous to:", previous.to.toISOString());
 
     return res.json({
       success: true,
@@ -146,7 +194,8 @@ export const getVendorMetrics = async (req: Request, res: Response) => {
             growthPercent: calcGrowth(reviewsCurrent, reviewsPrevious),
           },
           promotions: {
-            value: promotionsActive,
+            value: promotionsTotal,
+            activeCount: promotionsActive,
             current: promotionsCurrent,
             previous: promotionsPrevious,
             growthPercent: calcGrowth(promotionsCurrent, promotionsPrevious),

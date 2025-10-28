@@ -6,7 +6,12 @@ const prisma = new PrismaClient();
 // Create a new service review
 export const createServiceReview = async (req: Request, res: Response) => {
   try {
+    console.log("🔍 CREATE REVIEW - Request received");
+    console.log("  - Body:", req.body);
+
     const userId = (req as any).user?.id;
+    console.log("  - User ID:", userId);
+
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -15,6 +20,11 @@ export const createServiceReview = async (req: Request, res: Response) => {
     }
 
     const { rating, comment, listingId, serviceId, vendorId } = req.body;
+    console.log("  - Rating:", rating);
+    console.log("  - Comment length:", comment?.length);
+    console.log("  - Listing ID:", listingId);
+    console.log("  - Service ID:", serviceId);
+    console.log("  - Vendor ID:", vendorId);
 
     // Basic validation
     if (!rating || rating < 1 || rating > 5) {
@@ -39,6 +49,7 @@ export const createServiceReview = async (req: Request, res: Response) => {
     }
 
     // Check if user already has a review for this listing
+    console.log("🔍 CREATE REVIEW - Checking for existing review...");
     const existingReview = await prisma.review.findFirst({
       where: {
         userId,
@@ -47,12 +58,17 @@ export const createServiceReview = async (req: Request, res: Response) => {
     });
 
     if (existingReview) {
+      console.log(
+        "❌ CREATE REVIEW - Existing review found:",
+        existingReview.id
+      );
       return res.status(400).json({
         success: false,
         message:
           "You have already reviewed this service. You can update your existing review instead.",
       });
     }
+    console.log("✅ CREATE REVIEW - No existing review found");
 
     // Verify the listing exists and get vendor info
     const listing = await prisma.serviceListing.findUnique({
@@ -144,10 +160,47 @@ export const getServiceReviews = async (req: Request, res: Response) => {
       sortOrder = "desc",
     } = req.query;
 
-    // Build where clause
+    const userId = (req as any).user?.id;
+
+    console.log("🔍 GET SERVICE REVIEWS:");
+    console.log("  - Listing ID:", listingId);
+    console.log("  - User ID:", userId);
+    console.log("  - Has userId:", !!userId);
+
+    // Build where clause - default to showing only verified reviews
     const whereClause: any = {
       listingId,
+      isVerified: true, // Only show verified reviews by default
     };
+
+    // Check if the user is the vendor for this listing
+    // If they are, show all reviews (including unverified)
+    if (userId) {
+      const listing = await prisma.serviceListing.findUnique({
+        where: { id: listingId },
+        include: {
+          vendor: {
+            select: { userId: true },
+          },
+        },
+      });
+
+      console.log("  - Listing found:", !!listing);
+      if (listing) {
+        console.log("  - Listing vendor userId:", listing.vendor.userId);
+        console.log("  - Is vendor?", listing.vendor.userId === userId);
+      }
+
+      // If user is the vendor, remove the isVerified filter to show all reviews
+      if (listing && listing.vendor.userId === userId) {
+        console.log("  - Removing isVerified filter for vendor");
+        delete whereClause.isVerified;
+      }
+    } else {
+      console.log("  - No userId, showing only verified reviews");
+    }
+
+    console.log("  - Final whereClause:", whereClause);
 
     if (rating) {
       whereClause.rating = parseInt(rating as string);
@@ -471,10 +524,18 @@ export const deleteServiceReview = async (req: Request, res: Response) => {
 const updateListingReviewStats = async (listingId: string) => {
   try {
     const stats = await prisma.review.aggregate({
-      where: { listingId },
+      where: {
+        listingId,
+        isVerified: true, // Only count verified reviews for display
+      },
       _avg: { rating: true },
       _count: { rating: true },
     });
+
+    console.log("🔍 UPDATE LISTING REVIEW STATS:");
+    console.log("  - Listing ID:", listingId);
+    console.log("  - Average rating:", stats._avg.rating);
+    console.log("  - Total reviews count:", stats._count.rating);
 
     await prisma.serviceListing.update({
       where: { id: listingId },
@@ -483,6 +544,8 @@ const updateListingReviewStats = async (listingId: string) => {
         totalReviews: stats._count.rating || 0,
       },
     });
+
+    console.log("✅ Total reviews updated to:", stats._count.rating || 0);
   } catch (error) {
     console.error("Error updating listing review stats:", error);
   }
@@ -519,6 +582,22 @@ export const toggleReviewHelpful = async (req: Request, res: Response) => {
         message: "Review not found",
       });
     }
+
+    // Check if review is verified
+    console.log("🔍 TOGGLE HELPFUL - Review verification check:");
+    console.log("  - Review ID:", reviewId);
+    console.log("  - Review isVerified:", review.isVerified);
+    console.log("  - Review helpful count:", review.helpful);
+
+    if (!review.isVerified) {
+      console.log("❌ Review is not verified, rejecting vote");
+      return res.status(400).json({
+        success: false,
+        message: "Cannot vote on unverified reviews",
+      });
+    }
+
+    console.log("✅ Review is verified, proceeding with vote");
 
     // Check if user already voted
     const existingVote = await prisma.reviewHelpful.findUnique({
@@ -604,6 +683,19 @@ export const checkReviewHelpful = async (req: Request, res: Response) => {
       });
     }
 
+    // Get the review to access helpful count
+    const review = await prisma.review.findUnique({
+      where: { id: reviewId },
+      select: { helpful: true },
+    });
+
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        message: "Review not found",
+      });
+    }
+
     // Check if user has already voted for this review
     const existingVote = await prisma.reviewHelpful.findUnique({
       where: {
@@ -618,6 +710,7 @@ export const checkReviewHelpful = async (req: Request, res: Response) => {
       success: true,
       data: {
         isHelpful: !!existingVote,
+        helpfulCount: review.helpful,
       },
     });
   } catch (error) {

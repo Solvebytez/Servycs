@@ -710,6 +710,9 @@ export const tokenLogin = async (
   const { signInTokn, signInToken } = req.body;
   const token = signInTokn || signInToken;
 
+  console.log("🔍 TOKEN LOGIN - Received request");
+  console.log("🔍 TOKEN LOGIN - Token:", token?.substring(0, 50) + "...");
+
   if (!token) {
     throw new CustomError("Sign-in token is required", 400);
   }
@@ -727,13 +730,22 @@ export const tokenLogin = async (
     phone,
   } = tokenData;
 
+  console.log("🔍 TOKEN LOGIN - Decoded token data:", {
+    email,
+    username,
+    provider,
+    hasPassword: !!password,
+  });
+
   // Find existing user by email OR username (if email looks like a username)
   let existingUser;
 
   // Check if email field contains @ (actual email) or is a username
   const isEmailFormat = email.includes("@");
+  console.log("🔍 TOKEN LOGIN - Is email format:", isEmailFormat);
 
   if (isEmailFormat) {
+    console.log("🔍 TOKEN LOGIN - Searching by email:", email);
     existingUser = await prisma.user.findUnique({
       where: { email },
       include: {
@@ -743,10 +755,13 @@ export const tokenLogin = async (
       },
     });
   } else {
+    console.log("🔍 TOKEN LOGIN - Searching by username:", email);
     // Email field contains username, search by username instead
     const { findUserByIdentifier } = await import("@/utils/identifierUtils");
     existingUser = await findUserByIdentifier(email);
   }
+
+  console.log("🔍 TOKEN LOGIN - User found:", !!existingUser);
 
   // For LOCAL provider login, ensure password is provided
   if (provider === "LOCAL" && !password) {
@@ -755,8 +770,10 @@ export const tokenLogin = async (
 
   // For LOCAL provider, validate password if user exists
   if (provider === "LOCAL" && existingUser) {
+    console.log("🔍 TOKEN LOGIN - Validating password for LOCAL provider");
     // Check if user has a password (LOCAL users should have passwords)
     if (!existingUser.password) {
+      console.log("🔍 TOKEN LOGIN - User has no password stored");
       throw new CustomError("Invalid credentials", 401);
     }
 
@@ -765,7 +782,9 @@ export const tokenLogin = async (
       password!,
       existingUser.password
     );
+    console.log("🔍 TOKEN LOGIN - Password valid:", isPasswordValid);
     if (!isPasswordValid) {
+      console.log("🔍 TOKEN LOGIN - Password validation failed");
       throw new CustomError("Invalid credentials", 401);
     }
 
