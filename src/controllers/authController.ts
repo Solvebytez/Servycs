@@ -1664,3 +1664,269 @@ export const updateUsername = async (
     },
   });
 };
+
+// Change password
+export const changePassword = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.user!.id;
+
+  console.log("🔐 Change password request received for user:", userId);
+  console.log("📝 Request body:", {
+    currentPassword: currentPassword ? "***" : "empty",
+    newPassword: newPassword ? "***" : "empty",
+  });
+
+  if (!currentPassword || !newPassword) {
+    console.log("❌ Missing required fields");
+    throw new CustomError(
+      "Current password and new password are required",
+      400
+    );
+  }
+
+  // Get user with password
+  console.log("🔍 Fetching user from database...");
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      password: true,
+      email: true,
+      name: true,
+    },
+  });
+
+  if (!user) {
+    console.log("❌ User not found");
+    throw new CustomError("User not found", 404);
+  }
+
+  if (!user.password) {
+    console.log("❌ User does not have a password set");
+    throw new CustomError("User does not have a password set", 400);
+  }
+
+  console.log("✅ User found, verifying current password...");
+
+  // Verify current password
+  const isCurrentPasswordValid = await bcrypt.compare(
+    currentPassword,
+    user.password
+  );
+  if (!isCurrentPasswordValid) {
+    console.log("❌ Current password is incorrect");
+    throw new CustomError("Current password is incorrect", 400);
+  }
+
+  console.log(
+    "✅ Current password verified, checking if new password is different..."
+  );
+
+  // Check if new password is different from current password
+  const isSamePassword = await bcrypt.compare(newPassword, user.password);
+  if (isSamePassword) {
+    console.log("❌ New password is same as current password");
+    throw new CustomError(
+      "New password must be different from current password",
+      400
+    );
+  }
+
+  console.log("✅ New password is different, hashing new password...");
+
+  // Hash new password
+  const saltRounds = parseInt(process.env.BCRYPT_ROUNDS || "12");
+  const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+  console.log("✅ Password hashed, updating user in database...");
+
+  // Update password
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      password: hashedNewPassword,
+    },
+  });
+
+  console.log("✅ Password updated successfully");
+
+  res.json({
+    success: true,
+    message: "Password changed successfully",
+  });
+};
+
+// Change email - initiate process
+export const changeEmail = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  const { newEmail, password } = req.body;
+  const userId = req.user!.id;
+
+  console.log("📧 Change email request received for user:", userId);
+  console.log("📝 Request body:", {
+    newEmail: newEmail ? "***" : "empty",
+    password: password ? "***" : "empty",
+  });
+
+  if (!newEmail || !password) {
+    console.log("❌ Missing required fields");
+    throw new CustomError("New email and current password are required", 400);
+  }
+
+  // Get user with password
+  console.log("🔍 Fetching user from database...");
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      password: true,
+      name: true,
+    },
+  });
+
+  if (!user) {
+    console.log("❌ User not found");
+    throw new CustomError("User not found", 404);
+  }
+
+  if (!user.password) {
+    console.log("❌ User does not have a password set");
+    throw new CustomError("User does not have a password set", 400);
+  }
+
+  console.log("✅ User found, verifying current password...");
+
+  // Verify current password
+  const isPasswordValid = await bcrypt.compare(password, user.password);
+  if (!isPasswordValid) {
+    console.log("❌ Current password is incorrect");
+    throw new CustomError("Current password is incorrect", 400);
+  }
+
+  console.log(
+    "✅ Current password verified, checking if new email is different..."
+  );
+
+  // Check if new email is different from current email
+  if (user.email === newEmail) {
+    console.log("❌ New email is same as current email");
+    throw new CustomError(
+      "New email must be different from current email",
+      400
+    );
+  }
+
+  // Check if new email is already in use
+  const existingUser = await prisma.user.findUnique({
+    where: { email: newEmail },
+    select: { id: true, isEmailVerified: true },
+  });
+
+  if (existingUser) {
+    console.log("❌ Email already in use");
+    throw new CustomError("Email is already in use by another account", 409);
+  }
+
+  console.log("✅ New email is available, generating OTP...");
+
+  // Generate and store OTP for email change
+  const { otpCode, expiresAt } = generateOTPWithExpiration();
+  await storeOTP(user.id, otpCode, expiresAt);
+
+  // Send OTP email to new email address
+  const userName = user.name || user.email.split("@")[0] || "User";
+  const template = emailTemplates.otpVerification(userName, otpCode);
+
+  await sendEmail({
+    to: newEmail,
+    subject: `Email Change Verification - ${template.subject}`,
+    html: template.html,
+  });
+
+  console.log("✅ OTP sent to new email address");
+
+  res.json({
+    success: true,
+    message:
+      "OTP sent to your new email address. Please verify to complete email change.",
+    data: {
+      newEmail,
+      expiresAt: expiresAt.toISOString(),
+    },
+  });
+};
+
+// Verify email change with OTP
+export const verifyEmailChange = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  const { newEmail, otpCode } = req.body;
+  const userId = req.user!.id;
+
+  console.log("📧 Verify email change request received for user:", userId);
+  console.log("📝 Request body:", {
+    newEmail: newEmail ? "***" : "empty",
+    otpCode: otpCode ? "***" : "empty",
+  });
+
+  if (!newEmail || !otpCode) {
+    console.log("❌ Missing required fields");
+    throw new CustomError("New email and OTP code are required", 400);
+  }
+
+  // Get user
+  console.log("🔍 Fetching user from database...");
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+    },
+  });
+
+  if (!user) {
+    console.log("❌ User not found");
+    throw new CustomError("User not found", 404);
+  }
+
+  console.log("✅ User found, verifying OTP...");
+
+  // Verify OTP
+  const isValidOTP = await verifyOTP(user.id, otpCode);
+  if (!isValidOTP) {
+    console.log("❌ Invalid OTP");
+    throw new CustomError("Invalid or expired OTP code", 400);
+  }
+
+  console.log("✅ OTP verified, updating email...");
+
+  // Update user email
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      email: newEmail,
+      isEmailVerified: true, // Mark as verified since they verified the OTP
+    },
+  });
+
+  // Clear OTP after successful verification
+  await clearOTP(user.id);
+
+  console.log("✅ Email updated successfully");
+
+  res.json({
+    success: true,
+    message: "Email changed successfully",
+    data: {
+      newEmail,
+    },
+  });
+};

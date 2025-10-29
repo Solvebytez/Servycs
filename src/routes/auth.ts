@@ -27,6 +27,9 @@ import {
   resendOTP,
   checkUsername,
   updateUsername,
+  changePassword,
+  changeEmail,
+  verifyEmailChange,
 } from "@/controllers/authController";
 import { getUserProfilePicture } from "@/utils/imageUtils";
 import {
@@ -39,6 +42,11 @@ import {
   tokenAuthValidation,
   updateUsernameValidation,
 } from "@/validators/authValidators";
+import {
+  changePasswordValidation,
+  changeEmailValidation,
+  verifyEmailChangeValidation,
+} from "@/validators/userValidators";
 
 const router = Router();
 
@@ -477,6 +485,30 @@ router.put(
   authenticate,
   [...updateUsernameValidation, validateRequest],
   updateUsername
+);
+
+// Change password (protected route)
+router.put(
+  "/change-password",
+  authenticate,
+  [...changePasswordValidation, validateRequest],
+  changePassword
+);
+
+// Change email (protected route)
+router.post(
+  "/change-email",
+  authenticate,
+  [...changeEmailValidation, validateRequest],
+  changeEmail
+);
+
+// Verify email change (protected route)
+router.post(
+  "/verify-email-change",
+  authenticate,
+  [...verifyEmailChangeValidation, validateRequest],
+  verifyEmailChange
 );
 
 export default router;

@@ -8,6 +8,7 @@ import {
   updatePromotion,
   deletePromotion,
   getActivePromotions,
+  getPromotionDetails,
 } from "../controllers/promotionController";
 import {
   createPromotionValidation,
@@ -16,8 +17,9 @@ import {
 
 const router = Router();
 
-// Public route for active promotions (no authentication required)
+// Public routes (no authentication required)
 router.get("/active", getActivePromotions);
+router.get("/details/:id", getPromotionDetails);
 
 // All other promotion routes require vendor authentication
 router.use(authenticate);

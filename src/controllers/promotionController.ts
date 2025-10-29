@@ -1013,3 +1013,262 @@ export const getActivePromotions = async (
   }
   return;
 };
+
+// Get promotion details by ID (public - for users)
+export const getPromotionDetails = async (
+  req: Request,
+  res: Response
+): Promise<Response | undefined> => {
+  try {
+    const { id } = req.params;
+
+    // Get the promotion with service listings and full service details
+    const promotion = await prisma.promotion.findFirst({
+      where: {
+        id,
+        status: "ACTIVE",
+        isPromotionOn: true,
+        startDate: { lte: new Date() },
+        endDate: { gte: new Date() },
+      },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            businessName: true,
+            businessPhone: true,
+            businessEmail: true,
+          },
+        },
+        serviceListings: {
+          include: {
+            serviceListing: {
+              include: {
+                vendor: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                      },
+                    },
+                  },
+                },
+                category: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                  },
+                },
+                address: true,
+                services: {
+                  where: {
+                    status: "ACTIVE",
+                    isServiceOn: true,
+                  },
+                  orderBy: { price: "asc" },
+                  select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    price: true,
+                    discountPrice: true,
+                    currency: true,
+                    duration: true,
+                    status: true,
+                    isServiceOn: true,
+                    rating: true,
+                    totalReviews: true,
+                    totalBookings: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    categoryIds: true,
+                    categoryPaths: true,
+                  },
+                },
+                promotionListings: {
+                  where: {
+                    promotion: {
+                      status: "ACTIVE",
+                      isPromotionOn: true,
+                      startDate: { lte: new Date() },
+                      endDate: { gte: new Date() },
+                    },
+                  },
+                  include: {
+                    promotion: {
+                      select: {
+                        id: true,
+                        title: true,
+                        discountType: true,
+                        discountValue: true,
+                      },
+                    },
+                  },
+                },
+                _count: {
+                  select: {
+                    reviews: {
+                      where: {
+                        isVerified: true, // Only count verified reviews
+                      },
+                    },
+                    bookings: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!promotion) {
+      return res.status(404).json({
+        success: false,
+        message: "Promotion not found or not active",
+      });
+    }
+
+    // Calculate verified ratings for each service listing
+    const serviceListingsWithVerifiedRatings = await Promise.all(
+      promotion.serviceListings.map(async (psl: any) => {
+        // Get verified review stats for this service listing
+        const verifiedReviewStats = await prisma.review.aggregate({
+          where: {
+            listingId: psl.serviceListing.id,
+            isVerified: true,
+          },
+          _avg: { rating: true },
+          _count: { rating: true },
+        });
+
+        return {
+          ...psl,
+          verifiedRating: verifiedReviewStats._avg.rating || 0,
+          verifiedReviewCount: verifiedReviewStats._count.rating || 0,
+        };
+      })
+    );
+
+    // Prepare response with full service details
+    const response = {
+      id: promotion.id,
+      title: promotion.title,
+      description: promotion.description,
+      discountType: promotion.discountType,
+      discountValue: promotion.discountValue,
+      originalPrice: promotion.originalPrice,
+      startDate: promotion.startDate.toISOString(),
+      endDate: promotion.endDate.toISOString(),
+      bannerImage: promotion.bannerImage,
+      status: promotion.status,
+      isPromotionOn: promotion.isPromotionOn,
+      vendor: promotion.vendor,
+      serviceListings: serviceListingsWithVerifiedRatings.map((psl: any) => {
+        // Calculate minimum price from active services (same logic as search)
+        const validPrices = psl.serviceListing.services
+          .map((s: any) => s.price)
+          .filter(
+            (price: any) =>
+              price !== null && price !== undefined && !isNaN(price)
+          );
+
+        const minPrice =
+          validPrices.length > 0 ? Math.min(...validPrices) : null;
+
+        // Extract category name using same logic as popular services
+        let categoryName = "General";
+        if (psl.serviceListing.category?.name) {
+          categoryName = psl.serviceListing.category.name;
+        } else if (
+          psl.serviceListing.categoryPath &&
+          psl.serviceListing.categoryPath.length > 0
+        ) {
+          // Use the root category from categoryPath
+          categoryName =
+            psl.serviceListing.categoryPath[0]?.name || categoryName;
+        } else if (
+          psl.serviceListing.services?.[0]?.categoryPaths &&
+          psl.serviceListing.services[0].categoryPaths.length > 0
+        ) {
+          // Use the longest/most specific category path
+          const longestPath =
+            psl.serviceListing.services[0].categoryPaths.reduce(
+              (longest: any, current: any) => {
+                return current.length > longest.length ? current : longest;
+              },
+              []
+            );
+          // categoryPaths is an array of arrays of strings
+          // Use the last item in the longest path (most specific)
+          categoryName =
+            longestPath.length > 0
+              ? longestPath[longestPath.length - 1]
+              : categoryName;
+        }
+
+        return {
+          id: psl.serviceListing.id,
+          title: psl.serviceListing.title,
+          description: psl.serviceListing.description,
+          image: psl.serviceListing.image,
+          category: psl.serviceListing.category,
+          categoryPath: psl.serviceListing.categoryPath,
+          categoryName, // Add extracted category name
+          rating: psl.verifiedRating,
+          totalReviews: psl.verifiedReviewCount,
+          totalBookings: psl.serviceListing._count.bookings,
+          address: psl.serviceListing.address,
+          vendor: psl.serviceListing.vendor,
+          services: psl.serviceListing.services,
+          promotionListings: psl.serviceListing.promotionListings,
+          // Add calculated discount info for each service
+          servicesWithDiscount: psl.serviceListing.services.map(
+            (service: any) => {
+              const originalPrice = service.price || 0;
+              const discountedPrice =
+                promotion.discountType === "FIXED"
+                  ? Math.max(0, originalPrice - promotion.discountValue)
+                  : Math.max(
+                      0,
+                      originalPrice * (1 - promotion.discountValue / 100)
+                    );
+
+              return {
+                ...service,
+                originalPrice,
+                discountedPrice,
+                savings: originalPrice - discountedPrice,
+                discountText:
+                  promotion.discountType === "FIXED"
+                    ? `₹${promotion.discountValue} OFF`
+                    : `${promotion.discountValue}% OFF`,
+              };
+            }
+          ),
+          // Add minPrice for "Start from" display
+          minPrice,
+        };
+      }),
+      createdAt: promotion.createdAt.toISOString(),
+      updatedAt: promotion.updatedAt.toISOString(),
+    };
+
+    res.status(200).json({
+      success: true,
+      data: response,
+      message: "Promotion details retrieved successfully",
+    });
+  } catch (error) {
+    logger.error("Error getting promotion details:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: process.env.NODE_ENV === "development" ? error : undefined,
+    });
+  }
+  return;
+};

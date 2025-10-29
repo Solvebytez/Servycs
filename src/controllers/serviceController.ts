@@ -1329,6 +1329,27 @@ export const getServiceListingById = async (req: Request, res: Response) => {
           orderBy: { createdAt: "desc" },
           take: 10,
         },
+        promotionListings: {
+          where: {
+            promotion: {
+              status: "ACTIVE",
+              isPromotionOn: true,
+              startDate: { lte: new Date() },
+              endDate: { gte: new Date() },
+            },
+          },
+          include: {
+            promotion: {
+              select: {
+                id: true,
+                title: true,
+                discountType: true,
+                discountValue: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
         _count: {
           select: {
             bookings: true,
