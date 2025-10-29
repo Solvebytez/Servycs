@@ -4,6 +4,7 @@ import { env } from "./env";
 export const corsConfig: CorsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps, Postman, etc.)
+    // This is crucial for React Native production builds
     if (!origin) return callback(null, true);
 
     // Allow localhost for development
@@ -11,7 +12,7 @@ export const corsConfig: CorsOptions = {
       return callback(null, true);
     }
 
-    // Allow React Native Metro bundler
+    // Allow React Native Metro bundler (development)
     if (origin.includes("metro") || origin.includes("react-native")) {
       return callback(null, true);
     }
@@ -32,6 +33,12 @@ export const corsConfig: CorsOptions = {
 
     // In development, allow all origins
     if (env.NODE_ENV === "development") {
+      return callback(null, true);
+    }
+
+    // For production, be more restrictive but still allow mobile apps
+    // Mobile apps typically don't send origin headers
+    if (env.NODE_ENV === "production" && !origin) {
       return callback(null, true);
     }
 
