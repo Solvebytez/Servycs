@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
-import { logger } from '@/utils/logger';
+import { Request, Response, NextFunction } from "express";
+import { logger } from "@/utils/logger";
 
 export interface AppError extends Error {
   statusCode?: number;
@@ -30,64 +30,67 @@ export const errorHandler = (
 
   // Log error
   logger.error({
-    error: err.message,
+    message: err.message,
     stack: err.stack,
     url: req.url,
     method: req.method,
     ip: req.ip,
-    userAgent: req.get('User-Agent')
+    userAgent: req.get("User-Agent"),
+    statusCode: err.statusCode || 500,
   });
 
   // Mongoose bad ObjectId
-  if (err.name === 'CastError') {
-    const message = 'Resource not found';
+  if (err.name === "CastError") {
+    const message = "Resource not found";
     error = new CustomError(message, 404);
   }
 
   // Mongoose duplicate key
-  if (err.name === 'MongoError' && (err as any).code === 11000) {
-    const message = 'Duplicate field value entered';
+  if (err.name === "MongoError" && (err as any).code === 11000) {
+    const message = "Duplicate field value entered";
     error = new CustomError(message, 400);
   }
 
   // Mongoose validation error
-  if (err.name === 'ValidationError') {
-    const message = Object.values((err as any).errors).map((val: any) => val.message).join(', ');
+  if (err.name === "ValidationError") {
+    const message = Object.values((err as any).errors)
+      .map((val: any) => val.message)
+      .join(", ");
     error = new CustomError(message, 400);
   }
 
   // JWT errors
-  if (err.name === 'JsonWebTokenError') {
-    const message = 'Invalid token';
+  if (err.name === "JsonWebTokenError") {
+    const message = "Invalid token";
     error = new CustomError(message, 401);
   }
 
-  if (err.name === 'TokenExpiredError') {
-    const message = 'Token expired';
+  if (err.name === "TokenExpiredError") {
+    const message = "Token expired";
     error = new CustomError(message, 401);
   }
 
   // Prisma errors
-  if (err.name === 'PrismaClientKnownRequestError') {
+  if (err.name === "PrismaClientKnownRequestError") {
     const prismaError = err as any;
     switch (prismaError.code) {
-      case 'P2002':
-        error = new CustomError('Duplicate field value entered', 400);
+      case "P2002":
+        error = new CustomError("Duplicate field value entered", 400);
         break;
-      case 'P2025':
-        error = new CustomError('Record not found', 404);
+      case "P2025":
+        error = new CustomError("Record not found", 404);
         break;
-      case 'P2003':
-        error = new CustomError('Foreign key constraint failed', 400);
+      case "P2003":
+        error = new CustomError("Foreign key constraint failed", 400);
         break;
       default:
-        error = new CustomError('Database operation failed', 500);
+        error = new CustomError("Database operation failed", 500);
     }
   }
 
   res.status(error.statusCode || 500).json({
     success: false,
-    error: error.message || 'Server Error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    error: error.message || "Server Error",
+    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 };

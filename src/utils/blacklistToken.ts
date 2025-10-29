@@ -1,5 +1,5 @@
-import { prisma } from '@/config/database';
-import { logger } from '@/utils/logger';
+import { prisma } from "@/config/database";
+import { logger } from "@/utils/logger";
 
 /**
  * Add a token to the blacklist
@@ -13,19 +13,21 @@ export const blacklistToken = async (token: string): Promise<void> => {
     await prisma.blacklistToken.create({
       data: {
         token,
-        expiresAt
-      }
+        expiresAt,
+      },
     });
 
-    logger.info('Token blacklisted successfully', { tokenLength: token.length });
+    logger.info("Token blacklisted successfully", {
+      tokenLength: token.length,
+    });
   } catch (error) {
     // If token already exists, ignore the error (already blacklisted)
-    if ((error as any)?.code === 'P2002') {
-      logger.debug('Token already blacklisted');
+    if ((error as any)?.code === "P2002") {
+      logger.debug("Token already blacklisted");
       return;
     }
-    
-    logger.error('Failed to blacklist token:', error);
+
+    logger.error("Failed to blacklist token:", error);
     throw error;
   }
 };
@@ -37,12 +39,12 @@ export const isTokenBlacklisted = async (token: string): Promise<boolean> => {
   try {
     const blacklistedToken = await prisma.blacklistToken.findUnique({
       where: { token },
-      select: { id: true }
+      select: { id: true },
     });
 
     return !!blacklistedToken;
   } catch (error) {
-    logger.error('Failed to check blacklisted token:', error);
+    logger.error("Failed to check blacklisted token:", error);
     // In case of error, allow the request to proceed
     // but log the error for investigation
     return false;
@@ -58,15 +60,15 @@ export const cleanupExpiredTokens = async (): Promise<number> => {
     const result = await prisma.blacklistToken.deleteMany({
       where: {
         expiresAt: {
-          lt: new Date()
-        }
-      }
+          lt: new Date(),
+        },
+      },
     });
 
     logger.info(`Cleaned up ${result.count} expired blacklisted tokens`);
     return result.count;
   } catch (error) {
-    logger.error('Failed to cleanup expired tokens:', error);
+    logger.error("Failed to cleanup expired tokens:", error);
     throw error;
   }
 };
@@ -78,7 +80,7 @@ export const getBlacklistedTokenCount = async (): Promise<number> => {
   try {
     return await prisma.blacklistToken.count();
   } catch (error) {
-    logger.error('Failed to get blacklisted token count:', error);
+    logger.error("Failed to get blacklisted token count:", error);
     return 0;
   }
 };
@@ -86,21 +88,43 @@ export const getBlacklistedTokenCount = async (): Promise<number> => {
 /**
  * Remove a specific token from blacklist (if needed for debugging)
  */
-export const removeTokenFromBlacklist = async (token: string): Promise<boolean> => {
+export const removeTokenFromBlacklist = async (
+  token: string
+): Promise<boolean> => {
   try {
     const result = await prisma.blacklistToken.delete({
-      where: { token }
+      where: { token },
     });
 
-    logger.info('Token removed from blacklist', { tokenLength: token.length });
+    logger.info("Token removed from blacklist", { tokenLength: token.length });
     return true;
   } catch (error) {
-    if ((error as any)?.code === 'P2025') {
+    if ((error as any)?.code === "P2025") {
       // Token not found in blacklist
       return false;
     }
-    
-    logger.error('Failed to remove token from blacklist:', error);
+
+    logger.error("Failed to remove token from blacklist:", error);
     throw error;
+  }
+};
+
+/**
+ * Blacklist all tokens for a specific user (for single device login)
+ * This is a simplified approach - in production, you might want to track
+ * active tokens per user in a separate table
+ */
+export const blacklistAllUserTokens = async (userId: string): Promise<void> => {
+  try {
+    // For now, we'll create a placeholder token to invalidate all previous sessions
+    // In a more sophisticated system, you'd track active tokens per user
+    const placeholderToken = `user_${userId}_${Date.now()}`;
+
+    await blacklistToken(placeholderToken);
+
+    logger.info("All tokens blacklisted for user", { userId });
+  } catch (error) {
+    logger.error("Failed to blacklist all user tokens:", error);
+    // Don't throw error to avoid breaking login flow
   }
 };

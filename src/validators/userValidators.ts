@@ -106,6 +106,28 @@ export const changePasswordValidation = [
   }),
 ];
 
+export const changeEmailValidation = [
+  body("newEmail")
+    .isEmail()
+    .withMessage("Please provide a valid email address")
+    .normalizeEmail(),
+  body("password")
+    .notEmpty()
+    .withMessage("Current password is required for email change"),
+];
+
+export const verifyEmailChangeValidation = [
+  body("newEmail")
+    .isEmail()
+    .withMessage("Please provide a valid email address")
+    .normalizeEmail(),
+  body("otpCode")
+    .isLength({ min: 6, max: 6 })
+    .withMessage("OTP code must be 6 digits")
+    .isNumeric()
+    .withMessage("OTP code must contain only numbers"),
+];
+
 export const searchUsersValidation = [
   query("search")
     .optional()
@@ -118,7 +140,7 @@ export const searchUsersValidation = [
     .withMessage("Invalid role"),
   query("status")
     .optional()
-    .isIn(["ACTIVE", "INACTIVE", "SUSPENDED", "PENDING", "VERIFIED"])
+    .isIn(["ACTIVE", "INACTIVE", "SUSPENDED", "PENDING"])
     .withMessage("Invalid status"),
   query("page")
     .optional()

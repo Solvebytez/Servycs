@@ -14,7 +14,10 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "db:seed": "ts-node prisma/seed.ts"
+    "db:seed": "ts-node prisma/seed.ts",
+    "seed:categories": "ts-node -r tsconfig-paths/register src/scripts/seedCategories.ts",
+    "seed:users": "ts-node -r tsconfig-paths/register src/scripts/seedUsers.ts",
+    "check:salesmen": "ts-node -r tsconfig-paths/register src/scripts/checkSalesmen.ts"
   },
   "keywords": [
     "listro",
@@ -26,9 +29,11 @@
   "license": "MIT",
   "dependencies": {
     "@prisma/client": "^5.6.0",
+    "@types/bcrypt": "^6.0.0",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "aws-sdk": "^2.1490.0",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^1.41.0",
     "compression": "^1.7.4",
@@ -52,7 +57,8 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "winston": "^3.11.0",
-    "winston-daily-rotate-file": "^4.7.1"
+    "winston-daily-rotate-file": "^4.7.1",
+    "zod": "^4.1.9"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

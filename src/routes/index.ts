@@ -1,31 +1,43 @@
-import { Router } from 'express';
-import authRoutes from './auth';
-import userRoutes from './user';
-import vendorRoutes from './vendor';
-import serviceRoutes from './service';
-import bookingRoutes from './booking';
-import adminRoutes from './admin';
-import uploadRoutes from './upload';
+import { Router } from "express";
+import authRoutes from "./auth";
+import userRoutes from "./user";
+import vendorRoutes from "./vendor";
+import serviceRoutes from "./service";
+import bookingRoutes from "./booking";
+import adminRoutes from "./admin";
+import uploadRoutes from "./upload";
+import promotionRoutes from "./promotion";
+import categoryRoutes from "./category";
+import adminCategoriesRoutes from "./adminCategories";
+import appReviewRoutes from "./appReview";
+import serviceReviewRoutes from "./serviceReview";
+import savedListsRoutes from "./savedLists";
 
 const router = Router();
 
 // Health check
-router.get('/health', (req, res) => {
+router.get("/health", (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'Listro API is running',
+    message: "Listro API is running",
     timestamp: new Date().toISOString(),
-    version: process.env.API_VERSION || 'v1'
+    version: process.env.API_VERSION || "v1",
   });
 });
 
 // API Routes
-router.use('/auth', authRoutes);
-router.use('/users', userRoutes);
-router.use('/vendors', vendorRoutes);
-router.use('/services', serviceRoutes);
-router.use('/bookings', bookingRoutes);
-router.use('/admin', adminRoutes);
-router.use('/upload', uploadRoutes);
+router.use("/auth", authRoutes);
+router.use("/users", userRoutes);
+router.use("/users", savedListsRoutes); // Saved lists routes are under /users
+router.use("/vendors", vendorRoutes);
+router.use("/services", serviceRoutes);
+router.use("/bookings", bookingRoutes);
+router.use("/admin", adminRoutes);
+router.use("/admin/categories", adminCategoriesRoutes);
+router.use("/categories", categoryRoutes);
+router.use("/upload", uploadRoutes);
+router.use("/promotions", promotionRoutes);
+router.use("/app-reviews", appReviewRoutes);
+router.use("/service-reviews", serviceReviewRoutes);
 
 export default router;

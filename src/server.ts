@@ -1,5 +1,6 @@
 import "express-async-errors";
 import express from "express";
+import path from "path";
 import { serverConfig } from "@/config/server";
 import { setupMiddleware } from "@/middleware/setup";
 import { setupSwagger } from "@/middleware/swagger";
@@ -26,6 +27,12 @@ export class Server {
     // Setup Swagger documentation
     setupSwagger(this.app);
 
+    // Serve static files from uploads directory
+    this.app.use(
+      "/uploads",
+      express.static(path.join(__dirname, "../uploads"))
+    );
+
     // Health check endpoint
     this.app.get("/health", (req, res) => {
       res.status(200).json({
@@ -39,6 +46,9 @@ export class Server {
     // Token-based auth routes (at root level /api/login and /api/register)
     this.app.post("/api/login", tokenLogin);
     this.app.post("/api/register", tokenRegister);
+
+    // Category routes (at root level /api/categories for consistency)
+    this.app.use("/api/categories", require("@/routes/category").default);
 
     // API routes
     this.app.use("/api/v1", setupRoutes());

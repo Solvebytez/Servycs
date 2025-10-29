@@ -30,28 +30,34 @@ enum UserStatus {
   INACTIVE
   SUSPENDED
   PENDING
-  VERIFIED
 }
 
-// Service Categories Enum
-enum ServiceCategory {
-  HEALTH_CARE
-  FITNESS
-  TRAVEL
-  LOANS
-  DOCTORS
-  BEAUTY
-  GYMS
-  REPAIRS_SERVICES
-  RETAIL
-  PROFESSIONAL_SERVICES
-  RESTAURANTS
-  HOTEL_SERVICE
-  TECH_SERVICE
-  CAFE_SNACKS
-  WEAR_ACC
-  CAR_SERVICE
-  SPA_CENTER
+// Category Model for nested categories
+model Category {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  slug        String // URL-friendly version of name
+  description String?
+  isActive    Boolean @default(true)
+
+  // Self-referential relation for parent/child hierarchy
+  parentId String?    @db.ObjectId
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children Category[] @relation("CategoryHierarchy")
+
+  // Metadata
+  sortOrder Int      @default(0) // For custom ordering
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  serviceListings ServiceListing[] // Service listings using this category
+  Service         Service[] // Services using this category (via categoryId field)
+
+  @@unique([slug])
+  @@index([parentId])
+  @@index([isActive])
+  @@map("categories")
 }
 
 // Booking Status Enum
@@ -95,6 +101,40 @@ enum ContentStatus {
   FLAGGED
 }
 
+// Service Listing Status Enum
+enum ServiceListingStatus {
+  DRAFT
+  PENDING
+  ACTIVE
+  REJECTED
+  OFF_SERVICE
+}
+
+// Promotion Status Enum
+enum PromotionStatus {
+  ACTIVE
+  PENDING
+  INACTIVE
+  EXPIRED
+  REJECTED
+}
+
+// Enquiry Status Enum
+enum EnquiryStatus {
+  PENDING
+  RESPONDED
+  CLOSED
+}
+
+// Enquiry Channel Enum
+enum EnquiryChannel {
+  APP
+  WHATSAPP
+  PHONE
+  EMAIL
+  OTHER
+}
+
 // Image Type Enum
 enum ImageType {
   PROFILE_PICTURE
@@ -109,23 +149,203 @@ enum ImageType {
   ICON_IMAGE
 }
 
+// Activity Types Enum
+enum ActivityType {
+  // User Management
+  USER_SIGNUP
+  USER_VERIFIED
+  USER_SUSPENDED
+  USER_ACTIVATED
+  USER_PROFILE_UPDATED
+
+  // Vendor Management
+  VENDOR_SIGNUP
+  VENDOR_VERIFIED
+  VENDOR_SUSPENDED
+  VENDOR_ACTIVATED
+  VENDOR_PROFILE_UPDATED
+  VENDOR_BUSINESS_UPDATED
+
+  // Service Listings
+  SERVICE_LISTING_CREATED
+  SERVICE_LISTING_UPDATED
+  SERVICE_LISTING_APPROVED
+  SERVICE_LISTING_REJECTED
+  SERVICE_LISTING_ACTIVATED
+  SERVICE_LISTING_DEACTIVATED
+  SERVICE_LISTING_FEATURED
+
+  // Individual Services
+  SERVICE_CREATED
+  SERVICE_UPDATED
+  SERVICE_ACTIVATED
+  SERVICE_DEACTIVATED
+
+  // Bookings
+  BOOKING_CREATED
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  BOOKING_COMPLETED
+  BOOKING_NO_SHOW
+  BOOKING_RESCHEDULED
+
+  // Payments
+  PAYMENT_INITIATED
+  PAYMENT_COMPLETED
+  PAYMENT_FAILED
+  PAYMENT_REFUNDED
+
+  // Reviews & Ratings
+  REVIEW_POSTED
+  REVIEW_UPDATED
+  REVIEW_DELETED
+  REVIEW_HELPFUL_VOTED
+  APP_REVIEW_POSTED
+
+  // Enquiries
+  ENQUIRY_CREATED
+  ENQUIRY_RESPONDED
+  ENQUIRY_CLOSED
+  ENQUIRY_ESCALATED
+
+  // Promotions
+  PROMOTION_CREATED
+  PROMOTION_ACTIVATED
+  PROMOTION_EXPIRED
+  PROMOTION_CANCELLED
+  PROMOTION_APPLIED
+
+  // User Interactions
+  SERVICE_FAVORITED
+  SERVICE_UNFAVORITED
+  SERVICE_SAVED_TO_LIST
+  SERVICE_REMOVED_FROM_LIST
+  SAVED_LIST_CREATED
+  SAVED_LIST_UPDATED
+  SAVED_LIST_DELETED
+
+  // Support & Moderation
+  SUPPORT_TICKET_CREATED
+  SUPPORT_TICKET_ASSIGNED
+  SUPPORT_TICKET_RESOLVED
+  SUPPORT_TICKET_CLOSED
+  CONTENT_FLAGGED
+  CONTENT_APPROVED
+  CONTENT_REJECTED
+
+  // Admin Actions
+  ADMIN_USER_SUSPENDED
+  ADMIN_USER_ACTIVATED
+  ADMIN_VENDOR_VERIFIED
+  ADMIN_VENDOR_SUSPENDED
+  ADMIN_SERVICE_APPROVED
+  ADMIN_SERVICE_REJECTED
+
+  // System Events
+  COMMISSION_EARNED
+  TARGET_ACHIEVED
+  TARGET_MISSED
+  SYSTEM_ANNOUNCEMENT
+  MAINTENANCE_SCHEDULED
+
+  // Custom Activities
+  CUSTOM_ACTIVITY
+}
+
+// Notification Types Enum
+enum NotificationType {
+  // User & Vendor Management
+  USER_WELCOME
+  USER_VERIFICATION
+  VENDOR_WELCOME
+  VENDOR_VERIFICATION
+  ACCOUNT_SUSPENDED
+  ACCOUNT_ACTIVATED
+
+  // Service & Listing
+  SERVICE_APPROVED
+  SERVICE_REJECTED
+  SERVICE_FEATURED
+  LISTING_NEEDS_ATTENTION
+
+  // Bookings
+  NEW_BOOKING_REQUEST
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  BOOKING_REMINDER
+  BOOKING_COMPLETED
+  BOOKING_NO_SHOW
+
+  // Payments
+  PAYMENT_RECEIVED
+  PAYMENT_FAILED
+  PAYMENT_REFUNDED
+  COMMISSION_EARNED
+
+  // Reviews
+  NEW_REVIEW_RECEIVED
+  REVIEW_RESPONSE_NEEDED
+  REVIEW_HELPFUL_RECEIVED
+
+  // Enquiries
+  NEW_ENQUIRY_RECEIVED
+  ENQUIRY_RESPONSE_RECEIVED
+  ENQUIRY_ESCALATED
+
+  // Promotions
+  PROMOTION_APPROVED
+  PROMOTION_REJECTED
+  PROMOTION_EXPIRING
+  PROMOTION_APPLIED
+
+  // User Engagement
+  SERVICE_FAVORITED
+  NEW_FOLLOWER
+  LIST_SHARED
+
+  // Support
+  SUPPORT_TICKET_CREATED
+  SUPPORT_TICKET_ASSIGNED
+  SUPPORT_TICKET_RESOLVED
+  SUPPORT_RESPONSE_RECEIVED
+
+  // Admin & System
+  ADMIN_ACTION_REQUIRED
+  SYSTEM_MAINTENANCE
+  SYSTEM_ANNOUNCEMENT
+  TARGET_ACHIEVEMENT
+  TARGET_REMINDER
+
+  // Salesman Specific
+  NEW_VENDOR_ONBOARDED
+  NEW_USER_ONBOARDED
+  COMMISSION_MILESTONE
+  TERRITORY_UPDATE
+
+  // Custom
+  CUSTOM_NOTIFICATION
+}
+
 // Main User Model
 model User {
-  id              String       @id @default(auto()) @map("_id") @db.ObjectId
-  email           String       @unique
-  password        String?
-  name            String
-  phone           String?
-  role            UserRole     @default(USER)
-  status          UserStatus   @default(PENDING)
-  provider        AuthProvider @default(LOCAL)
-  providerId      String?
-  isEmailVerified Boolean      @default(false)
-  isPhoneVerified Boolean      @default(false)
-  otpCode         String?
-  otpExpiresAt    DateTime?
-  otpAttempts     Int          @default(0)
-  lastLoginAt     DateTime?
+  id               String       @id @default(auto()) @map("_id") @db.ObjectId
+  username         String?      @unique // Username for login (lowercase, 5-30 chars)
+  email            String       @unique
+  password         String?
+  name             String
+  phone            String?
+  role             UserRole     @default(USER)
+  status           UserStatus   @default(PENDING)
+  provider         AuthProvider @default(LOCAL)
+  providerId       String?
+  isEmailVerified  Boolean      @default(false)
+  isPhoneVerified  Boolean      @default(false)
+  otpCode          String?
+  otpExpiresAt     DateTime?
+  otpAttempts      Int          @default(0)
+  lastLoginAt      DateTime?
+  currentSessionId String? // Track current active session for single device login
+  createdBy        String?      @db.ObjectId // ID of user who created this user (for salesman-created vendors)
 
   // Primary/Personal Address
   primaryAddress String?
@@ -144,6 +364,7 @@ model User {
   admin           Admin?
   bookings        Booking[]
   reviews         Review[]
+  appReviews      AppReview[]
   savedLists      SavedList[]
   supportTickets  SupportTicket[]
   flaggedContent  FlaggedContent[]
@@ -151,6 +372,20 @@ model User {
   adminActions    AdminAction[]
   auditLogs       AuditLog[]
   uploadedImages  Image[]
+  favorites       UserFavorite[]
+  helpfulVotes    ReviewHelpful[]  @relation("UserHelpfulVotes")
+
+  // Created by relations (for salesman-created vendors)
+  createdVendors    User[]    @relation("UserCreatedBy") // Users created by this user (salesman)
+  createdBysalesman User?     @relation("UserCreatedBy", fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction) // User who created this user
+  Enquiry           Enquiry[]
+
+  // Activity relations
+  activitiesAsActor  Activity[]     @relation("ActivityActor")
+  activitiesAsTarget Activity[]     @relation("ActivityTarget")
+  activitiesAsUser   Activity[]     @relation("ActivityUser")
+  notifications      Notification[]
+  deviceTokens       DeviceToken[]
 
   @@map("users")
 }
@@ -166,20 +401,20 @@ model BusinessAddress {
   zipCode     String?
   country     String   @default("India")
   description String?
-  isPrimary   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor          Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  serviceListings ServiceListing[]
 
   @@map("business_addresses")
 }
 
 // Vendor Model
 model Vendor {
-  id                     String            @id @default(auto()) @map("_id") @db.ObjectId
-  userId                 String            @unique @db.ObjectId
+  id                     String     @id @default(auto()) @map("_id") @db.ObjectId
+  userId                 String     @unique @db.ObjectId
   businessName           String
   businessEmail          String
   businessPhone          String
@@ -188,23 +423,27 @@ model Vendor {
   businessInsurance      String?
   businessCertifications String[]
   businessHours          Json? // Store as JSON for flexible hours
-  categories             ServiceCategory[]
-  verificationStatus     UserStatus        @default(PENDING)
-  isVerified             Boolean           @default(false)
-  rating                 Float             @default(0)
-  totalReviews           Int               @default(0)
-  totalBookings          Int               @default(0)
-  totalRevenue           Float             @default(0)
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
+  // Categories removed - now handled through services
+  verificationStatus     UserStatus @default(PENDING)
+  isVerified             Boolean    @default(false)
+  rating                 Float      @default(0)
+  totalReviews           Int        @default(0)
+  totalBookings          Int        @default(0)
+  totalRevenue           Float      @default(0)
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
   // Relations
   user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  services          Service[]
+  businessAddresses BusinessAddress[]
+  serviceListings   ServiceListing[]
   bookings          Booking[]
   reviews           Review[]
   promotions        Promotion[]
-  businessAddresses BusinessAddress[]
+  // Note: Service[] relation removed - using vendorId field in Service model instead
+  Service           Service[]
+  Enquiry           Enquiry[]
+  activities        Activity[]
 
   @@map("vendors")
 }
@@ -223,8 +462,9 @@ model Salesman {
   updatedAt        DateTime @updatedAt
 
   // Relations
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookings Booking[]
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings   Booking[]
+  activities Activity[]
 
   @@map("salesmen")
 }
@@ -246,30 +486,84 @@ model Admin {
   @@map("admins")
 }
 
-// Service Model
-model Service {
-  id            String          @id @default(auto()) @map("_id") @db.ObjectId
-  vendorId      String          @db.ObjectId
-  name          String
-  description   String
-  category      ServiceCategory
-  subcategory   String?
-  price         Float
-  currency      String          @default("INR")
-  duration      Int? // Duration in minutes
-  isActive      Boolean         @default(true)
-  isFeatured    Boolean         @default(false)
-  rating        Float           @default(0)
-  totalReviews  Int             @default(0)
-  totalBookings Int             @default(0)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+// Service Listing Model - Main listing created by vendor
+model ServiceListing {
+  id             String               @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId       String               @db.ObjectId
+  title          String // Shop/Service name
+  description    String // Main description
+  categoryId     String?              @db.ObjectId
+  categoryPath   String[] // Full category path for easy filtering
+  contactNumber  String
+  whatsappNumber String
+  image          String? // Main service image URL
+  addressId      String?              @db.ObjectId // Business address ID
+  businessHours  Json? // Business hours for the shop/listing
+  status         ServiceListingStatus @default(DRAFT)
+  isServiceOn    Boolean              @default(true) // Vendor can turn service on/off
+  isFeatured     Boolean              @default(false)
+  rating         Float                @default(0)
+  totalReviews   Int                  @default(0)
+  totalBookings  Int                  @default(0)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
   // Relations
-  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  bookings Booking[]
-  reviews  Review[]
+  vendor            Vendor                    @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  category          Category?                 @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  address           BusinessAddress?          @relation(fields: [addressId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  services          Service[] // Individual services within this listing
+  bookings          Booking[]
+  reviews           Review[]
+  promotionListings PromotionServiceListing[]
+  favoritedBy       UserFavorite[]
+  savedInLists      SavedListItem[] // Services saved in user's custom lists
+  Enquiry           Enquiry[]
 
+  @@index([categoryId])
+  @@index([vendorId])
+  @@index([addressId])
+  @@index([status])
+  @@index([isServiceOn])
+  @@index([isFeatured])
+  @@map("service_listings")
+}
+
+// Individual Service Model - Services within a listing
+model Service {
+  id            String               @id @default(auto()) @map("_id") @db.ObjectId
+  listingId     String               @db.ObjectId // Reference to ServiceListing
+  name          String
+  description   String
+  price         Float? // Optional price
+  discountPrice Float? // Optional discount price
+  currency      String               @default("INR")
+  duration      Int? // Duration in minutes (optional)
+  status        ServiceListingStatus @default(DRAFT)
+  isServiceOn   Boolean              @default(true) // Vendor can turn individual service on/off
+  rating        Float                @default(0)
+  totalReviews  Int                  @default(0)
+  totalBookings Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  // Relations
+  listing       ServiceListing @relation(fields: [listingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  bookings      Booking[]
+  reviews       Review[]
+  categoryIds   String[]       @db.ObjectId // Array of category IDs
+  categoryPaths Json? // Array of category paths for easy filtering
+  Category      Category?      @relation(fields: [categoryId], references: [id])
+  categoryId    String?        @db.ObjectId
+  Vendor        Vendor?        @relation(fields: [vendorId], references: [id])
+  vendorId      String?        @db.ObjectId
+  Enquiry       Enquiry[]
+
+  @@index([listingId])
+  @@index([status])
+  @@index([isServiceOn])
+  @@index([categoryIds]) // For efficient multi-category filtering
+  @@index([categoryId]) // For single category filtering
   @@map("services")
 }
 
@@ -277,7 +571,8 @@ model Service {
 model Booking {
   id                 String        @id @default(auto()) @map("_id") @db.ObjectId
   userId             String        @db.ObjectId
-  serviceId          String        @db.ObjectId
+  listingId          String        @db.ObjectId // Reference to ServiceListing
+  serviceId          String?       @db.ObjectId // Optional reference to specific Service
   vendorId           String        @db.ObjectId
   salesmanId         String?       @db.ObjectId
   bookingDate        DateTime
@@ -292,69 +587,217 @@ model Booking {
   updatedAt          DateTime      @updatedAt
 
   // Relations
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  salesman Salesman? @relation(fields: [salesmanId], references: [id], onDelete: SetNull)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  listing  ServiceListing @relation(fields: [listingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service  Service?       @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vendor   Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  salesman Salesman?      @relation(fields: [salesmanId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@map("bookings")
 }
 
-// Review Model
+// Service Review Model - For individual service reviews
 model Review {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   userId     String   @db.ObjectId
-  serviceId  String   @db.ObjectId
+  listingId  String   @db.ObjectId // Reference to ServiceListing
+  serviceId  String?  @db.ObjectId // Optional reference to specific Service
   vendorId   String   @db.ObjectId
   rating     Int // 1-5 stars
   comment    String?
   isVerified Boolean  @default(false)
+  helpful    Int      @default(0) // Number of users who found this helpful
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   // Relations
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  vendor  Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  listing      ServiceListing  @relation(fields: [listingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service      Service?        @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vendor       Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  helpfulVotes ReviewHelpful[] @relation("ReviewHelpfulVotes")
 
   @@map("reviews")
 }
 
-// Saved List Model
+// Review Helpful Votes Model - Track which users marked reviews as helpful
+model ReviewHelpful {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  reviewId  String   @db.ObjectId
+  userId    String   @db.ObjectId
+  createdAt DateTime @default(now())
+
+  // Relations
+  review Review @relation("ReviewHelpfulVotes", fields: [reviewId], references: [id], onDelete: Cascade)
+  user   User   @relation("UserHelpfulVotes", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Ensure one vote per user per review
+  @@unique([reviewId, userId])
+  @@map("review_helpful")
+}
+
+// Enquiry Model - User enquiries about a vendor's service listing
+model Enquiry {
+  id        String         @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId  String         @db.ObjectId
+  listingId String         @db.ObjectId
+  serviceId String?        @db.ObjectId
+  userId    String         @db.ObjectId
+  message   String?
+  channel   EnquiryChannel @default(APP)
+  status    EnquiryStatus  @default(PENDING)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  // Relations
+  vendor  Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  listing ServiceListing @relation(fields: [listingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service Service?       @relation(fields: [serviceId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([vendorId, createdAt])
+  @@index([vendorId, status])
+  @@index([listingId])
+  @@index([userId, createdAt])
+  @@map("enquiries")
+}
+
+// App Review Status Enum
+enum AppReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  HIDDEN
+}
+
+// App Review Model - For overall app feedback and ratings
+model AppReview {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String          @db.ObjectId
+  rating      Int // 1-5 stars for overall app experience
+  title       String? // Optional review title
+  comment     String? // Detailed feedback about the app
+  categories  String[] // Array of categories being reviewed (e.g., ["UI/UX", "Performance", "Features"])
+  ratings     Json? // Detailed ratings for different aspects (e.g., {"UI": 5, "Performance": 4, "Features": 3})
+  isAnonymous Boolean         @default(false) // Allow anonymous reviews
+  status      AppReviewStatus @default(PENDING) // Moderation status
+  isPublic    Boolean         @default(true) // Whether to show in public reviews
+  helpful     Int             @default(0) // Number of users who found this helpful
+  notHelpful  Int             @default(0) // Number of users who found this not helpful
+  deviceInfo  Json? // Device and app version info
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId])
+  @@index([rating])
+  @@index([status])
+  @@index([isPublic])
+  @@index([createdAt])
+  @@map("app_reviews")
+}
+
+// Saved List Model - User's custom named lists
 model SavedList {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   userId      String   @db.ObjectId
-  name        String
-  description String?
-  services    String[] // Array of service IDs
-  isPublic    Boolean  @default(false)
+  name        String // Custom list name like "Beauty Services", "Fitness Routine"
+  description String? // Optional description
+  color       String? // Custom color for list (hex code)
+  icon        String? // Custom icon name for list
+  isPublic    Boolean  @default(false) // Share list with others
+  isDefault   Boolean  @default(false) // Default "Favorites" list
+  sortOrder   Int      @default(0) // Custom ordering
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items SavedListItem[] // Services in this list
 
+  @@index([userId])
+  @@index([isDefault])
+  @@index([sortOrder])
   @@map("saved_lists")
+}
+
+// Saved List Item Model - Junction table for many-to-many relationship
+model SavedListItem {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  savedListId      String   @db.ObjectId
+  serviceListingId String   @db.ObjectId
+  addedAt          DateTime @default(now())
+  notes            String? // User's personal notes for this service in this list
+  sortOrder        Int      @default(0) // Order within the list
+
+  // Relations
+  savedList      SavedList      @relation(fields: [savedListId], references: [id], onDelete: Cascade)
+  serviceListing ServiceListing @relation(fields: [serviceListingId], references: [id], onDelete: Cascade)
+
+  @@unique([savedListId, serviceListingId]) // Prevent duplicate services in same list
+  @@index([savedListId])
+  @@index([serviceListingId])
+  @@index([addedAt])
+  @@map("saved_list_items")
+}
+
+// User Favorite Model - Individual service listings favorited by users
+model UserFavorite {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String   @db.ObjectId
+  serviceListingId String   @db.ObjectId
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceListing ServiceListing @relation(fields: [serviceListingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, serviceListingId])
+  @@index([userId])
+  @@index([serviceListingId])
+  @@map("user_favorites")
 }
 
 // Promotion Model
 model Promotion {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  vendorId      String   @db.ObjectId
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId      String          @db.ObjectId
   title         String
   description   String
   discountType  String // PERCENTAGE, FIXED_AMOUNT
   discountValue Float
+  originalPrice Float? // For fixed amount discounts
   startDate     DateTime
   endDate       DateTime
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  bannerImage   String? // URL to banner image
+  status        PromotionStatus @default(PENDING)
+  isPromotionOn Boolean         @default(false) // Quick on/off toggle
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   // Relations
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor          Vendor                    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  serviceListings PromotionServiceListing[]
 
   @@map("promotions")
+}
+
+// Promotion Service Listing Junction Model
+model PromotionServiceListing {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  promotionId      String   @db.ObjectId
+  serviceListingId String   @db.ObjectId
+  createdAt        DateTime @default(now())
+
+  // Relations
+  promotion      Promotion      @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  serviceListing ServiceListing @relation(fields: [serviceListingId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, serviceListingId])
+  @@map("promotion_service_listings")
 }
 
 // Support Ticket Model
@@ -500,4 +943,101 @@ model Image {
   @@index([uploadedBy])
   @@index([isActive])
   @@map("images")
+}
+
+// Activity Model - Centralized activity tracking
+model Activity {
+  id         String       @id @default(auto()) @map("_id") @db.ObjectId
+  type       ActivityType
+  actorId    String?      @db.ObjectId // Who performed the action
+  targetId   String?      @db.ObjectId // What was affected
+  salesmanId String?      @db.ObjectId // Which salesman should be notified
+  vendorId   String?      @db.ObjectId // Which vendor is involved
+  userId     String?      @db.ObjectId // Which user is involved
+
+  // Rich metadata for different activity types
+  metadata Json // Flexible data storage
+
+  // Activity status and tracking
+  isRead      Boolean @default(false)
+  isProcessed Boolean @default(false)
+  priority    String  @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  actor         User?          @relation("ActivityActor", fields: [actorId], references: [id])
+  target        User?          @relation("ActivityTarget", fields: [targetId], references: [id])
+  salesman      Salesman?      @relation(fields: [salesmanId], references: [id])
+  vendor        Vendor?        @relation(fields: [vendorId], references: [id])
+  user          User?          @relation("ActivityUser", fields: [userId], references: [id])
+  notifications Notification[]
+
+  @@index([salesmanId, createdAt])
+  @@index([vendorId, createdAt])
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@index([isRead, createdAt])
+  @@map("activities")
+}
+
+// Notification Model - Push notification management
+model Notification {
+  id         String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String           @db.ObjectId
+  activityId String?          @db.ObjectId
+  type       NotificationType
+  title      String
+  body       String
+  data       Json? // Additional payload data
+
+  // Notification status
+  isRead      Boolean @default(false)
+  isSent      Boolean @default(false)
+  isDelivered Boolean @default(false)
+
+  // Delivery tracking
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+
+  // Retry mechanism
+  retryCount Int @default(0)
+  maxRetries Int @default(3)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity Activity? @relation(fields: [activityId], references: [id])
+
+  @@index([userId, isRead, createdAt])
+  @@index([isSent, createdAt])
+  @@index([type, createdAt])
+  @@map("notifications")
+}
+
+// Device Token Model - Push notification device management
+model DeviceToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  token      String   @unique
+  platform   String // ios, android, web
+  deviceId   String? // Unique device identifier
+  appVersion String? // App version for compatibility
+  isActive   Boolean  @default(true)
+  lastUsed   DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([platform])
+  @@map("device_tokens")
 }

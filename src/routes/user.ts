@@ -38,6 +38,7 @@ router.get(
         select: {
           id: true,
           name: true,
+          username: true,
           email: true,
           phone: true,
           role: true,
@@ -68,6 +69,7 @@ router.get(
       let profileData: any = {
         id: user.id,
         name: user.name,
+        username: user.username,
         email: user.email,
         phone: user.phone,
         role: user.role,
@@ -116,7 +118,6 @@ router.get(
                   zipCode: true,
                   country: true,
                   description: true,
-                  isPrimary: true,
                 },
               },
             },
@@ -135,7 +136,6 @@ router.get(
               zipCode: addr.zipCode,
               country: addr.country,
               description: addr.description,
-              isPrimary: addr.isPrimary,
             })
           );
 
@@ -299,7 +299,10 @@ router.put(
         });
 
         // Add new business addresses (don't delete existing ones)
-        if (updateData.businessAddresses.length > 0) {
+        if (
+          updateData.businessAddresses &&
+          Array.isArray(updateData.businessAddresses)
+        ) {
           await (prisma as any).businessAddress.createMany({
             data: updateData.businessAddresses.map((addr: any) => ({
               vendorId: vendorRecord.id, // Use vendor's ID, not user's ID
@@ -310,7 +313,6 @@ router.put(
               zipCode: addr.zipCode || "",
               country: addr.country || "India",
               description: addr.description || "",
-              isPrimary: addr.isPrimary || false,
             })),
           });
         }
@@ -350,6 +352,7 @@ router.put(
         select: {
           id: true,
           name: true,
+          username: true,
           email: true,
           phone: true,
           role: true,
@@ -373,6 +376,7 @@ router.put(
       let profileData: any = {
         id: updatedUser!.id,
         name: updatedUser!.name,
+        username: updatedUser!.username,
         email: updatedUser!.email,
         phone: updatedUser!.phone,
         role: updatedUser!.role,
@@ -421,7 +425,6 @@ router.put(
                   zipCode: true,
                   country: true,
                   description: true,
-                  isPrimary: true,
                 },
               },
             },
@@ -439,7 +442,6 @@ router.put(
             zipCode: addr.zipCode,
             country: addr.country,
             description: addr.description,
-            isPrimary: addr.isPrimary,
           }));
 
           profileData = {
@@ -502,20 +504,82 @@ router.post(
 
       const newRole = role.toUpperCase() as UserRole;
 
-      // Update user role
+      // Import required utilities
+      const { generateSessionId, generateAccessToken } = await import(
+        "@/utils/jwt"
+      );
+      const { blacklistAllUserTokens } = await import("@/utils/blacklistToken");
+
+      // Generate new session ID for role switch (maintains single device login)
+      const newSessionId = generateSessionId();
+
+      // Update user role and session ID
       const updatedUser = await prisma.user.update({
         where: { id: userId },
-        data: { role: newRole },
+        data: {
+          role: newRole,
+          currentSessionId: newSessionId,
+        },
         select: {
           id: true,
           email: true,
+          username: true,
           name: true,
           role: true,
           status: true,
           isEmailVerified: true,
+          currentSessionId: true,
           createdAt: true,
           updatedAt: true,
         },
+      });
+
+      // Create role-specific records if they don't exist
+      if (newRole === "VENDOR") {
+        const existingVendor = await prisma.vendor.findUnique({
+          where: { userId: userId },
+        });
+
+        if (!existingVendor) {
+          await prisma.vendor.create({
+            data: {
+              userId: userId,
+              businessName: `${updatedUser.name}'s Business`,
+              businessEmail: updatedUser.email,
+              businessPhone: "",
+              businessDescription: "",
+              businessLicense: null,
+              businessInsurance: null,
+              businessCertifications: [],
+            },
+          });
+          console.log(`Created vendor record for user ${userId}`);
+        }
+      } else if (newRole === "SALESMAN") {
+        const existingSalesman = await prisma.salesman.findUnique({
+          where: { userId: userId },
+        });
+
+        if (!existingSalesman) {
+          await prisma.salesman.create({
+            data: {
+              userId: userId,
+              territory: "General",
+            },
+          });
+          console.log(`Created salesman record for user ${userId}`);
+        }
+      }
+
+      // Blacklist all existing tokens for this user (single device login)
+      await blacklistAllUserTokens(userId);
+
+      // Generate new access token with new session ID
+      const newAccessToken = generateAccessToken({
+        userId: updatedUser.id,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        sessionId: newSessionId,
       });
 
       return res.json({
@@ -523,6 +587,7 @@ router.post(
         message: `Role switched to ${newRole} successfully`,
         data: {
           user: updatedUser,
+          accessToken: newAccessToken,
         },
       });
     } catch (error) {
@@ -530,6 +595,208 @@ router.post(
       return res.status(500).json({
         success: false,
         message: "Failed to switch role",
+      });
+    }
+  }
+);
+
+// GET /users/business-addresses - Get all business addresses for current vendor
+router.get(
+  "/business-addresses",
+  authenticate,
+  async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user.id;
+      const userRole = (req as any).user.role;
+
+      console.log("=== GET BUSINESS ADDRESSES DEBUG ===");
+      console.log("User ID:", userId);
+      console.log("User Role:", userRole);
+      console.log("=== END DEBUG ===");
+
+      // Only vendors can have business addresses
+      if (userRole !== "VENDOR") {
+        return res.status(403).json({
+          success: false,
+          message: "Only vendors can have business addresses",
+        });
+      }
+
+      // Get the vendor record for this user
+      const vendor = await prisma.vendor.findUnique({
+        where: { userId: userId },
+        include: {
+          businessAddresses: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              city: true,
+              state: true,
+              zipCode: true,
+              country: true,
+              description: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: [
+              { createdAt: "asc" }, // Order by creation date
+            ],
+          },
+        },
+      });
+
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: "Vendor record not found",
+        });
+      }
+
+      const businessAddresses = vendor.businessAddresses || [];
+
+      return res.json({
+        success: true,
+        data: businessAddresses,
+        message: "Business addresses retrieved successfully",
+      });
+    } catch (error) {
+      console.error("Error fetching business addresses:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch business addresses",
+        error: process.env.NODE_ENV === "development" ? error : undefined,
+      });
+    }
+  }
+);
+
+// POST /users/business-addresses - Create new business address
+router.post(
+  "/business-addresses",
+  authenticate,
+  validateRequest,
+  [
+    body("name")
+      .notEmpty()
+      .trim()
+      .isLength({ min: 2, max: 50 })
+      .withMessage(
+        "Address type is required and must be between 2 and 50 characters"
+      ),
+    body("address")
+      .notEmpty()
+      .trim()
+      .isLength({ min: 1, max: 500 })
+      .withMessage(
+        "Address is required and must be between 1 and 500 characters"
+      ),
+    body("city")
+      .notEmpty()
+      .trim()
+      .isLength({ min: 1, max: 100 })
+      .withMessage("City is required and must be between 1 and 100 characters"),
+    body("state")
+      .notEmpty()
+      .trim()
+      .isLength({ min: 1, max: 100 })
+      .withMessage(
+        "State is required and must be between 1 and 100 characters"
+      ),
+    body("zipCode")
+      .optional()
+      .trim()
+      .custom((value) => {
+        if (!value) return true; // Optional field
+        // Indian zip codes are 6 digits, starting with 1-9
+        const zipCodeRegex = /^[1-9][0-9]{5}$/;
+        if (!zipCodeRegex.test(value)) {
+          throw new Error("Please enter a valid Indian zip code (6 digits)");
+        }
+        return true;
+      }),
+    body("country")
+      .optional()
+      .trim()
+      .isLength({ min: 1, max: 100 })
+      .withMessage("Country must be between 1 and 100 characters"),
+    body("description")
+      .optional()
+      .trim()
+      .isLength({ max: 1000 })
+      .withMessage("Description must not exceed 1000 characters"),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user.id;
+      const userRole = (req as any).user.role;
+      const addressData = req.body;
+
+      console.log("=== CREATE BUSINESS ADDRESS DEBUG ===");
+      console.log("User ID:", userId);
+      console.log("User Role:", userRole);
+      console.log("Address Data:", addressData);
+      console.log("=== END DEBUG ===");
+
+      // Only vendors can create business addresses
+      if (userRole !== "VENDOR") {
+        return res.status(403).json({
+          success: false,
+          message: "Only vendors can create business addresses",
+        });
+      }
+
+      // Get the vendor record for this user
+      const vendor = await prisma.vendor.findUnique({
+        where: { userId: userId },
+      });
+
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: "Vendor record not found",
+        });
+      }
+
+      // Create the new business address
+      const newAddress = await prisma.businessAddress.create({
+        data: {
+          vendorId: vendor.id,
+          name: addressData.name,
+          address: addressData.address,
+          city: addressData.city,
+          state: addressData.state,
+          zipCode: addressData.zipCode || null,
+          country: addressData.country || "India",
+          description: addressData.description || null,
+        },
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          city: true,
+          state: true,
+          zipCode: true,
+          country: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      console.log("Created address:", newAddress);
+
+      return res.status(201).json({
+        success: true,
+        message: "Business address created successfully",
+        data: newAddress,
+      });
+    } catch (error) {
+      console.error("Error creating business address:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to create business address",
+        error: process.env.NODE_ENV === "development" ? error : undefined,
       });
     }
   }
@@ -645,7 +912,6 @@ router.put(
           zipCode: true,
           country: true,
           description: true,
-          isPrimary: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -733,6 +999,116 @@ router.delete(
         error: process.env.NODE_ENV === "development" ? error : undefined,
       });
     }
+  }
+);
+
+// Import user favorites controller and validators
+import {
+  getUserFavorites,
+  addToFavorites,
+  removeFromFavorites,
+  checkFavoriteStatus,
+} from "@/controllers/userFavoritesController";
+import {
+  getUserFavoritesValidation,
+  addToFavoritesValidation,
+  removeFromFavoritesValidation,
+  checkFavoriteStatusValidation,
+} from "@/validators/userFavoritesValidators";
+
+// GET /users/:userId/favorites - Get user's favorite service listings
+router.get(
+  "/:userId/favorites",
+  authenticate,
+  validateRequest,
+  getUserFavoritesValidation,
+  async (req: Request, res: Response) => {
+    // Check if user is accessing their own favorites or is admin
+    const authenticatedUserId = (req as any).user.id;
+    const requestedUserId = req.params.userId;
+    const userRole = (req as any).user.role;
+
+    if (authenticatedUserId !== requestedUserId && userRole !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "You can only access your own favorites",
+      });
+    }
+
+    // Call the controller
+    return getUserFavorites(req as any, res);
+  }
+);
+
+// POST /users/:userId/favorites/:serviceId - Add service to favorites
+router.post(
+  "/:userId/favorites/:serviceId",
+  authenticate,
+  validateRequest,
+  addToFavoritesValidation,
+  async (req: Request, res: Response) => {
+    // Check if user is adding to their own favorites or is admin
+    const authenticatedUserId = (req as any).user.id;
+    const requestedUserId = req.params.userId;
+    const userRole = (req as any).user.role;
+
+    if (authenticatedUserId !== requestedUserId && userRole !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "You can only add to your own favorites",
+      });
+    }
+
+    // Call the controller
+    return addToFavorites(req as any, res);
+  }
+);
+
+// DELETE /users/:userId/favorites/:serviceId - Remove service from favorites
+router.delete(
+  "/:userId/favorites/:serviceId",
+  authenticate,
+  validateRequest,
+  removeFromFavoritesValidation,
+  async (req: Request, res: Response) => {
+    // Check if user is removing from their own favorites or is admin
+    const authenticatedUserId = (req as any).user.id;
+    const requestedUserId = req.params.userId;
+    const userRole = (req as any).user.role;
+
+    if (authenticatedUserId !== requestedUserId && userRole !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "You can only remove from your own favorites",
+      });
+    }
+
+    // Call the controller
+    return removeFromFavorites(req as any, res);
+  }
+);
+
+// GET /users/:userId/favorites/:serviceId/status - Check if service is in favorites
+router.get(
+  "/:userId/favorites/:serviceId/status",
+  authenticate,
+  validateRequest,
+  checkFavoriteStatusValidation,
+  async (req: Request, res: Response) => {
+    // Check if user is checking their own favorites or is admin
+    const authenticatedUserId = (req as any).user.id;
+    const requestedUserId = req.params.userId;
+    const userRole = (req as any).user.role;
+
+    if (authenticatedUserId !== requestedUserId && userRole !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "You can only check your own favorites",
+      });
+    }
+
+    // Call the controller
+    return checkFavoriteStatus(req as any, res);
   }
 );
 

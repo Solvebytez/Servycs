@@ -3,6 +3,8 @@ import { v2 as cloudinary } from "cloudinary";
 import { Request } from "express";
 import { CustomError } from "@/middleware/errorHandler";
 import { env } from "@/config/env";
+import fs from "fs";
+import path from "path";
 
 // Configure Cloudinary
 cloudinary.config({
@@ -14,18 +16,24 @@ cloudinary.config({
 // Multer configuration for local storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
+    console.log("=== MULTER DESTINATION ===");
+    console.log("Setting destination to: uploads/");
     cb(null, "uploads/");
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(
-      null,
+    const filename =
       file.fieldname +
-        "-" +
-        uniqueSuffix +
-        "." +
-        file.originalname.split(".").pop()
-    );
+      "-" +
+      uniqueSuffix +
+      "." +
+      file.originalname.split(".").pop();
+
+    console.log("=== MULTER FILENAME ===");
+    console.log("Original filename:", file.originalname);
+    console.log("Generated filename:", filename);
+
+    cb(null, filename);
   },
 });
 
@@ -35,6 +43,14 @@ const fileFilter = (
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) => {
+  console.log("=== MULTER FILE FILTER ===");
+  console.log("File details:", {
+    fieldname: file.fieldname,
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size,
+  });
+
   // Allowed file types
   const allowedTypes = [
     "image/jpeg",
@@ -45,8 +61,10 @@ const fileFilter = (
   ];
 
   if (allowedTypes.includes(file.mimetype)) {
+    console.log("✅ File type allowed:", file.mimetype);
     cb(null, true);
   } else {
+    console.log("❌ File type not allowed:", file.mimetype);
     cb(
       new CustomError(
         "Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.",
@@ -70,6 +88,32 @@ export const uploadToCloudinary = async (
   file: Express.Multer.File,
   folder: string = "listro"
 ): Promise<string> => {
+  console.log("=== CLOUDINARY UPLOAD START ===");
+  console.log("File path:", file.path);
+  console.log("Folder:", folder);
+  console.log("File details:", {
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size,
+  });
+
+  // Check if Cloudinary is configured
+  if (
+    !env.CLOUDINARY_CLOUD_NAME ||
+    !env.CLOUDINARY_API_KEY ||
+    !env.CLOUDINARY_API_SECRET
+  ) {
+    console.log("⚠️ Cloudinary not configured, using local file URL");
+    // Return a local file URL for development
+    const baseUrl =
+      process.env.NODE_ENV === "production"
+        ? "https://your-domain.com"
+        : "http://192.168.0.131:5000";
+    const localUrl = `${baseUrl}/uploads/${file.filename}`;
+    console.log("✅ Local file URL generated:", localUrl);
+    return localUrl;
+  }
+
   try {
     const result = await cloudinary.uploader.upload(file.path, {
       folder: folder,
@@ -80,8 +124,19 @@ export const uploadToCloudinary = async (
       ],
     });
 
+    console.log("✅ Cloudinary upload successful");
+    console.log("Result:", {
+      public_id: result.public_id,
+      secure_url: result.secure_url,
+      width: result.width,
+      height: result.height,
+      format: result.format,
+      bytes: result.bytes,
+    });
+
     return result.secure_url;
   } catch (error) {
+    console.error("❌ Cloudinary upload failed:", error);
     throw new CustomError("Failed to upload file to Cloudinary", 500);
   }
 };
@@ -208,5 +263,39 @@ export const uploadBufferToCloudinary = async (
     return (result as any).secure_url;
   } catch (error) {
     throw new CustomError("Failed to upload buffer to Cloudinary", 500);
+  }
+};
+
+// Delete local file
+export const deleteLocalFile = (filePath: string): void => {
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log("✅ Local file deleted:", filePath);
+    } else {
+      console.log("⚠️ Local file not found:", filePath);
+    }
+  } catch (error) {
+    console.error("❌ Failed to delete local file:", filePath, error);
+    // Don't throw error as this shouldn't break the upload process
+  }
+};
+
+// Upload to Cloudinary and cleanup local file
+export const uploadToCloudinaryAndCleanup = async (
+  file: Express.Multer.File,
+  folder: string = "listro"
+): Promise<string> => {
+  try {
+    const cloudinaryUrl = await uploadToCloudinary(file, folder);
+
+    // Delete local file after successful Cloudinary upload
+    deleteLocalFile(file.path);
+
+    return cloudinaryUrl;
+  } catch (error) {
+    // If Cloudinary upload fails, still try to delete local file
+    deleteLocalFile(file.path);
+    throw error;
   }
 };

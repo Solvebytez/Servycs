@@ -4,6 +4,7 @@ import {
   uploadSingle,
   uploadMultiple,
   uploadToCloudinary,
+  uploadToCloudinaryAndCleanup,
   deleteFromCloudinary,
   extractPublicId,
 } from "@/utils/upload";
@@ -32,21 +33,43 @@ router.post(
   authenticate,
   uploadSingle,
   async (req: AuthenticatedRequest, res: Response) => {
+    console.log("=== PROFILE PICTURE UPLOAD START ===");
+    console.log("Request headers:", JSON.stringify(req.headers, null, 2));
+    console.log("Request body keys:", Object.keys(req.body || {}));
+    console.log(
+      "Request file:",
+      req.file
+        ? {
+            fieldname: req.file.fieldname,
+            originalname: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
+            destination: req.file.destination,
+            filename: req.file.filename,
+          }
+        : "No file"
+    );
+
     try {
       const userId = req.user!.id;
+      console.log("User ID:", userId);
+      console.log("User data:", req.user);
 
       if (!req.file) {
+        console.log("❌ No file uploaded");
         return res.status(400).json({
           success: false,
           message: "No file uploaded",
         });
       }
 
-      // Upload to Cloudinary
-      const cloudinaryUrl = await uploadToCloudinary(
+      console.log("✅ File received, uploading to Cloudinary...");
+      // Upload to Cloudinary and cleanup local file
+      const cloudinaryUrl = await uploadToCloudinaryAndCleanup(
         req.file,
         "listro/profile-pictures"
       );
+      console.log("✅ Cloudinary upload successful:", cloudinaryUrl);
 
       // Get image dimensions (optional) - multer doesn't provide dimensions
       const imageInfo = {
@@ -54,27 +77,41 @@ router.post(
         height: undefined,
       };
 
+      console.log("Checking for existing profile picture...");
       // Delete old profile picture record and file
       const oldProfilePicture = await getUserProfilePicture(userId);
       if (oldProfilePicture) {
+        console.log("Found existing profile picture:", oldProfilePicture.id);
         // Delete old image from Cloudinary (only if it's a Cloudinary URL)
         if (oldProfilePicture.url.includes("cloudinary.com")) {
           try {
             const publicId = extractPublicId(oldProfilePicture.url);
+            console.log(
+              "Deleting old image from Cloudinary, publicId:",
+              publicId
+            );
             await deleteFromCloudinary(publicId);
-            console.log("Successfully deleted old image from Cloudinary");
+            console.log("✅ Successfully deleted old image from Cloudinary");
           } catch (error) {
-            console.error("Failed to delete old image from Cloudinary:", error);
+            console.error(
+              "❌ Failed to delete old image from Cloudinary:",
+              error
+            );
             // Continue even if deletion fails
           }
         }
 
         // Delete the old profile picture record from database
+        console.log("Deleting old profile picture record from database...");
         await prisma.image.delete({
           where: { id: oldProfilePicture.id },
         });
+        console.log("✅ Old profile picture record deleted");
+      } else {
+        console.log("No existing profile picture found");
       }
 
+      console.log("Creating new image record...");
       // Create new image record
       const newImage = await createImage({
         url: cloudinaryUrl,
@@ -89,7 +126,9 @@ router.post(
         altText: `Profile picture for user ${userId}`,
         uploadedBy: userId,
       });
-      return res.status(200).json({
+      console.log("✅ New image record created:", newImage.id);
+
+      const responseData = {
         success: true,
         message: "Profile picture uploaded successfully",
         data: {
@@ -100,9 +139,24 @@ router.post(
           width: imageInfo.width,
           height: imageInfo.height,
         },
-      });
+      };
+
+      console.log("=== PROFILE PICTURE UPLOAD SUCCESS ===");
+      console.log("Response data:", JSON.stringify(responseData, null, 2));
+
+      return res.status(200).json(responseData);
     } catch (error) {
-      console.error("Profile picture upload error:", error);
+      console.error("=== PROFILE PICTURE UPLOAD ERROR ===");
+      console.error("Error details:", error);
+      console.error(
+        "Error message:",
+        error instanceof Error ? error.message : "Unknown error"
+      );
+      console.error(
+        "Error stack:",
+        error instanceof Error ? error.stack : "No stack trace"
+      );
+
       return res.status(500).json({
         success: false,
         message: "Failed to upload profile picture",
@@ -117,19 +171,26 @@ router.get(
   "/profile-picture",
   authenticate,
   async (req: AuthenticatedRequest, res: Response) => {
+    console.log("=== GET PROFILE PICTURE START ===");
+    console.log("User ID:", req.user?.id);
+    console.log("User data:", req.user);
+
     try {
       const userId = req.user!.id;
 
+      console.log("Fetching profile picture for user:", userId);
       const profilePicture = await getUserProfilePicture(userId);
 
       if (!profilePicture) {
+        console.log("❌ No profile picture found for user:", userId);
         return res.status(404).json({
           success: false,
           message: "No profile picture found",
         });
       }
 
-      return res.status(200).json({
+      console.log("✅ Profile picture found:", profilePicture.id);
+      const responseData = {
         success: true,
         message: "Profile picture retrieved successfully",
         data: {
@@ -141,9 +202,24 @@ router.get(
           height: profilePicture.height,
           uploadedAt: profilePicture.createdAt,
         },
-      });
+      };
+
+      console.log("=== GET PROFILE PICTURE SUCCESS ===");
+      console.log("Response data:", JSON.stringify(responseData, null, 2));
+
+      return res.status(200).json(responseData);
     } catch (error) {
-      console.error("Get profile picture error:", error);
+      console.error("=== GET PROFILE PICTURE ERROR ===");
+      console.error("Error details:", error);
+      console.error(
+        "Error message:",
+        error instanceof Error ? error.message : "Unknown error"
+      );
+      console.error(
+        "Error stack:",
+        error instanceof Error ? error.stack : "No stack trace"
+      );
+
       return res.status(500).json({
         success: false,
         message: "Failed to retrieve profile picture",
@@ -197,6 +273,216 @@ router.delete(
   }
 );
 
+// Promotion banner image upload endpoint
+router.post(
+  "/promotion-banner",
+  authenticate,
+  uploadSingle,
+  async (req: AuthenticatedRequest, res: Response) => {
+    console.log("=== PROMOTION BANNER UPLOAD START ===");
+    console.log("Request headers:", JSON.stringify(req.headers, null, 2));
+    console.log("Request body keys:", Object.keys(req.body || {}));
+    console.log(
+      "Request file:",
+      req.file
+        ? {
+            fieldname: req.file.fieldname,
+            originalname: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
+            destination: req.file.destination,
+            filename: req.file.filename,
+          }
+        : "No file"
+    );
+
+    try {
+      const userId = req.user!.id;
+      console.log("User ID:", userId);
+      console.log("User data:", req.user);
+
+      if (!req.file) {
+        console.log("❌ No file uploaded");
+        return res.status(400).json({
+          success: false,
+          message: "No file uploaded",
+        });
+      }
+
+      console.log("✅ File received, uploading to Cloudinary...");
+      // Upload to Cloudinary and cleanup local file
+      const cloudinaryUrl = await uploadToCloudinaryAndCleanup(
+        req.file,
+        "listro/promotion-banners"
+      );
+      console.log("✅ Cloudinary upload successful:", cloudinaryUrl);
+
+      // Get image dimensions (optional)
+      const imageInfo = {
+        width: undefined,
+        height: undefined,
+      };
+
+      console.log("Creating new image record...");
+      // Create new image record
+      const newImage = await createImage({
+        url: cloudinaryUrl,
+        filename: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        width: imageInfo.width,
+        height: imageInfo.height,
+        type: ImageType.SERVICE_PICTURE, // Using SERVICE_PICTURE type for now
+        entityType: "Promotion",
+        entityId: userId, // Will be updated when promotion is created
+        altText: `Promotion banner uploaded by user ${userId}`,
+        uploadedBy: userId,
+      });
+      console.log("✅ New image record created:", newImage.id);
+
+      const responseData = {
+        success: true,
+        message: "Promotion banner uploaded successfully",
+        data: {
+          imageId: newImage.id,
+          imageUrl: cloudinaryUrl,
+          filename: req.file.originalname,
+          size: req.file.size,
+          width: imageInfo.width,
+          height: imageInfo.height,
+        },
+      };
+
+      console.log("=== PROMOTION BANNER UPLOAD SUCCESS ===");
+      console.log("Response data:", JSON.stringify(responseData, null, 2));
+
+      return res.status(200).json(responseData);
+    } catch (error) {
+      console.error("=== PROMOTION BANNER UPLOAD ERROR ===");
+      console.error("Error details:", error);
+      console.error(
+        "Error message:",
+        error instanceof Error ? error.message : "Unknown error"
+      );
+      console.error(
+        "Error stack:",
+        error instanceof Error ? error.stack : "No stack trace"
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to upload promotion banner",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);
+
+// Service image upload endpoint
+router.post(
+  "/service-image",
+  authenticate,
+  uploadSingle,
+  async (req: AuthenticatedRequest, res: Response) => {
+    console.log("=== SERVICE IMAGE UPLOAD START ===");
+    console.log("Request headers:", JSON.stringify(req.headers, null, 2));
+    console.log("Request body keys:", Object.keys(req.body || {}));
+    console.log(
+      "Request file:",
+      req.file
+        ? {
+            fieldname: req.file.fieldname,
+            originalname: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
+            destination: req.file.destination,
+            filename: req.file.filename,
+          }
+        : "No file"
+    );
+
+    try {
+      const userId = req.user!.id;
+      console.log("User ID:", userId);
+      console.log("User data:", req.user);
+
+      if (!req.file) {
+        console.log("❌ No file uploaded");
+        return res.status(400).json({
+          success: false,
+          message: "No file uploaded",
+        });
+      }
+
+      console.log("✅ File received, uploading to Cloudinary...");
+      // Upload to Cloudinary and cleanup local file
+      const cloudinaryUrl = await uploadToCloudinaryAndCleanup(
+        req.file,
+        "listro/service-images"
+      );
+      console.log("✅ Cloudinary upload successful:", cloudinaryUrl);
+
+      // Get image dimensions (optional)
+      const imageInfo = {
+        width: undefined,
+        height: undefined,
+      };
+
+      console.log("Creating new image record...");
+      // Create new image record
+      const newImage = await createImage({
+        url: cloudinaryUrl,
+        filename: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        width: imageInfo.width,
+        height: imageInfo.height,
+        type: ImageType.SERVICE_PICTURE,
+        entityType: "ServiceListing",
+        entityId: userId, // Will be updated when service listing is created
+        altText: `Service image uploaded by user ${userId}`,
+        uploadedBy: userId,
+      });
+      console.log("✅ New image record created:", newImage.id);
+
+      const responseData = {
+        success: true,
+        message: "Service image uploaded successfully",
+        data: {
+          imageId: newImage.id,
+          imageUrl: cloudinaryUrl,
+          filename: req.file.originalname,
+          size: req.file.size,
+          width: imageInfo.width,
+          height: imageInfo.height,
+        },
+      };
+
+      console.log("=== SERVICE IMAGE UPLOAD SUCCESS ===");
+      console.log("Response data:", JSON.stringify(responseData, null, 2));
+
+      return res.status(200).json(responseData);
+    } catch (error) {
+      console.error("=== SERVICE IMAGE UPLOAD ERROR ===");
+      console.error("Error details:", error);
+      console.error(
+        "Error message:",
+        error instanceof Error ? error.message : "Unknown error"
+      );
+      console.error(
+        "Error stack:",
+        error instanceof Error ? error.stack : "No stack trace"
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to upload service image",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);
+
 // Single file upload endpoint
 router.post("/single", authenticate, uploadSingle, (req, res) => {
   res.json({ message: "Single file upload route - to be implemented" });
@@ -205,6 +491,63 @@ router.post("/single", authenticate, uploadSingle, (req, res) => {
 // Multiple files upload endpoint
 router.post("/multiple", authenticate, uploadMultiple, (req, res) => {
   res.json({ message: "Multiple files upload route - to be implemented" });
+});
+
+// Delete image endpoint
+router.delete("/image", authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { imageUrl } = req.body;
+    
+    if (!imageUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "Image URL is required",
+      });
+    }
+
+    console.log("🗑️ DELETE IMAGE - Starting deletion process");
+    console.log("Image URL:", imageUrl);
+
+    // Extract public ID from Cloudinary URL
+    const publicId = extractPublicId(imageUrl);
+    console.log("Public ID:", publicId);
+
+    if (!publicId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid image URL - cannot extract public ID",
+      });
+    }
+
+    // Delete from Cloudinary
+    await deleteFromCloudinary(publicId);
+    console.log("✅ Image deleted from Cloudinary successfully");
+
+    // Find and delete image record from database
+    const imageRecord = await prisma.image.findFirst({
+      where: { url: imageUrl },
+    });
+
+    if (imageRecord) {
+      await prisma.image.delete({
+        where: { id: imageRecord.id },
+      });
+      console.log("✅ Image record deleted from database");
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Image deleted successfully",
+    });
+
+  } catch (error) {
+    console.error("❌ DELETE IMAGE ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete image",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 });
 
 export default router;

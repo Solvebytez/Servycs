@@ -25,6 +25,11 @@ import {
   sendOTP,
   verifyOTPCode,
   resendOTP,
+  checkUsername,
+  updateUsername,
+  changePassword,
+  changeEmail,
+  verifyEmailChange,
 } from "@/controllers/authController";
 import { getUserProfilePicture } from "@/utils/imageUtils";
 import {
@@ -35,7 +40,13 @@ import {
   verifyEmailValidation,
   resendVerificationValidation,
   tokenAuthValidation,
+  updateUsernameValidation,
 } from "@/validators/authValidators";
+import {
+  changePasswordValidation,
+  changeEmailValidation,
+  verifyEmailChangeValidation,
+} from "@/validators/userValidators";
 
 const router = Router();
 
@@ -251,6 +262,7 @@ router.get(
         where: { id: req.user!.id },
         select: {
           id: true,
+          username: true,
           email: true,
           name: true,
           phone: true,
@@ -463,5 +475,40 @@ router.post("/verify-otp", verifyOTPCode);
  *               $ref: '#/components/schemas/Error'
  */
 router.post("/resend-otp", resendOTP);
+
+// Check username availability
+router.get("/check-username/:username", checkUsername);
+
+// Update username (protected route)
+router.put(
+  "/update-username",
+  authenticate,
+  [...updateUsernameValidation, validateRequest],
+  updateUsername
+);
+
+// Change password (protected route)
+router.put(
+  "/change-password",
+  authenticate,
+  [...changePasswordValidation, validateRequest],
+  changePassword
+);
+
+// Change email (protected route)
+router.post(
+  "/change-email",
+  authenticate,
+  [...changeEmailValidation, validateRequest],
+  changeEmail
+);
+
+// Verify email change (protected route)
+router.post(
+  "/verify-email-change",
+  authenticate,
+  [...verifyEmailChangeValidation, validateRequest],
+  verifyEmailChange
+);
 
 export default router;

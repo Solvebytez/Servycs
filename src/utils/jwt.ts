@@ -1,12 +1,14 @@
-import jwt from 'jsonwebtoken';
-import { Request, Response } from 'express';
-import { UserRole } from '@prisma/client';
-import { env } from '@/config/env';
+import jwt from "jsonwebtoken";
+import { Request, Response } from "express";
+import { UserRole } from "@prisma/client";
+import { env } from "@/config/env";
+import crypto from "crypto";
 
 interface TokenPayload {
   userId: string;
   email: string;
   role: UserRole;
+  sessionId?: string;
 }
 
 interface RefreshTokenPayload {
@@ -16,13 +18,13 @@ interface RefreshTokenPayload {
 
 export const generateAccessToken = (payload: TokenPayload): string => {
   return (jwt.sign as any)(payload, env.JWT_SECRET, {
-    expiresIn: env.JWT_ACCESS_EXPIRES_IN
+    expiresIn: env.JWT_ACCESS_EXPIRES_IN,
   });
 };
 
 export const generateRefreshToken = (payload: RefreshTokenPayload): string => {
   return (jwt.sign as any)(payload, env.JWT_REFRESH_SECRET, {
-    expiresIn: env.JWT_REFRESH_EXPIRES_IN
+    expiresIn: env.JWT_REFRESH_EXPIRES_IN,
   });
 };
 
@@ -31,34 +33,78 @@ export const verifyAccessToken = (token: string): TokenPayload => {
 };
 
 export const verifyRefreshToken = (token: string): RefreshTokenPayload => {
-  return (jwt.verify as any)(token, env.JWT_REFRESH_SECRET) as RefreshTokenPayload;
+  return (jwt.verify as any)(
+    token,
+    env.JWT_REFRESH_SECRET
+  ) as RefreshTokenPayload;
 };
 
 export const setRefreshTokenCookie = (res: Response, token: string): void => {
-  res.cookie('refreshToken', token, {
-    httpOnly: process.env.COOKIE_HTTP_ONLY === 'true',
-    secure: process.env.COOKIE_SECURE === 'true',
-    sameSite: process.env.COOKIE_SAME_SITE as 'lax' | 'strict' | 'none',
+  res.cookie("refreshToken", token, {
+    httpOnly: process.env.COOKIE_HTTP_ONLY === "true",
+    secure: process.env.COOKIE_SECURE === "true",
+    sameSite: process.env.COOKIE_SAME_SITE as "lax" | "strict" | "none",
     domain: process.env.COOKIE_DOMAIN,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    path: '/api/v1/auth/refresh'
+    path: "/api/v1/auth/refresh",
   });
 };
 
 export const clearRefreshTokenCookie = (res: Response): void => {
-  res.clearCookie('refreshToken', {
-    httpOnly: process.env.COOKIE_HTTP_ONLY === 'true',
-    secure: process.env.COOKIE_SECURE === 'true',
-    sameSite: process.env.COOKIE_SAME_SITE as 'lax' | 'strict' | 'none',
+  res.clearCookie("refreshToken", {
+    httpOnly: process.env.COOKIE_HTTP_ONLY === "true",
+    secure: process.env.COOKIE_SECURE === "true",
+    sameSite: process.env.COOKIE_SAME_SITE as "lax" | "strict" | "none",
     domain: process.env.COOKIE_DOMAIN,
-    path: '/api/v1/auth/refresh'
+    path: "/api/v1/auth/refresh",
   });
 };
 
 export const extractTokenFromHeader = (req: Request): string | null => {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return null;
   }
   return authHeader.substring(7);
+};
+
+// Extract refresh token from both cookie and Bearer header
+export const extractRefreshToken = (req: Request): string | null => {
+  console.log("=== EXTRACTING REFRESH TOKEN ===");
+
+  // Check cookie first (for web browsers)
+  const cookieToken = req.cookies?.refreshToken;
+  console.log("Cookie refresh token:", cookieToken ? "EXISTS" : "NOT FOUND");
+
+  // Check Bearer header (for React Native)
+  const authHeader = req.headers.authorization;
+  console.log("Authorization header:", authHeader ? "EXISTS" : "NOT FOUND");
+
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const headerToken = authHeader.substring(7);
+    console.log(
+      "Header token extracted:",
+      headerToken ? "EXISTS" : "NOT FOUND"
+    );
+
+    // Return header token if available, otherwise cookie token
+    const token = headerToken || cookieToken;
+    console.log(
+      "Final refresh token source:",
+      headerToken ? "HEADER" : "COOKIE"
+    );
+    console.log("Final refresh token:", token ? "EXISTS" : "NOT FOUND");
+    console.log("=================================");
+    return token;
+  }
+
+  console.log("Final refresh token source: COOKIE");
+  console.log("Final refresh token:", cookieToken ? "EXISTS" : "NOT FOUND");
+  console.log("=================================");
+  return cookieToken;
+};
+
+// Generate a unique session ID for single device login
+export const generateSessionId = (): string => {
+  return crypto.randomBytes(32).toString("hex");
 };
